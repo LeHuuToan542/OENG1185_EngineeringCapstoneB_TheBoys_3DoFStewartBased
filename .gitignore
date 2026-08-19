@@ -1,0 +1,49 @@
+build
+mx.scratch
+!.settings
+# -------------------------
+# Build directories
+# -------------------------
+build/
+Debug/
+Release/
+out/
+
+# -------------------------
+# Compiled files
+# -------------------------
+*.o
+*.obj
+*.elf
+*.axf
+*.bin
+*.hex
+*.map
+*.lst
+
+# -------------------------
+# CMake temporary files
+# -------------------------
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# -------------------------
+# VS Code user-specific
+# -------------------------
+.vscode/settings.json
+
+# -------------------------
+# Operating system
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Temporary files
+# -------------------------
+*.tmp
+*.bak
+*.log
+*~
