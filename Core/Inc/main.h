@@ -56,14 +56,33 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+/* USER CODE BEGIN PTD */
+typedef struct {
+  GPIO_TypeDef *STEP_Port;
+  uint16_t STEP_Pin;
 
+  GPIO_TypeDef *DIR_Port;
+  uint16_t DIR_Pin;
+
+} StepperMotor;
+
+void Stepper_Move_Select(StepperMotor *motor, GPIO_PinState direction,
+                         uint32_t pulses);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define STEP_OUT_Pin GPIO_PIN_14
-#define STEP_OUT_GPIO_Port GPIOE
-#define DIR_OUT_Pin GPIO_PIN_12
-#define DIR_OUT_GPIO_Port GPIOG
+#define STEP_OUT_ACT3_Pin GPIO_PIN_9
+#define STEP_OUT_ACT3_GPIO_Port GPIOE
+#define DIR_OUT_ACT2_Pin GPIO_PIN_11
+#define DIR_OUT_ACT2_GPIO_Port GPIOE
+#define DIR_OUT_ACT1_Pin GPIO_PIN_13
+#define DIR_OUT_ACT1_GPIO_Port GPIOE
+#define STEP_OUT_ACT2_Pin GPIO_PIN_14
+#define STEP_OUT_ACT2_GPIO_Port GPIOE
+#define DIR_OUT_ACT3_Pin GPIO_PIN_12
+#define DIR_OUT_ACT3_GPIO_Port GPIOG
+#define STEP_OUT_ACT1_Pin GPIO_PIN_14
+#define STEP_OUT_ACT1_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
 

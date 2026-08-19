@@ -25,7 +25,6 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
 
@@ -44,7 +43,23 @@
 COM_InitTypeDef BspCOMInit;
 
 /* USER CODE BEGIN PV */
+StepperMotor Actuator1 = {.STEP_Port = STEP_OUT_ACT1_GPIO_Port,
+                          .STEP_Pin = STEP_OUT_ACT1_Pin,
 
+                          .DIR_Port = DIR_OUT_ACT1_GPIO_Port,
+                          .DIR_Pin = DIR_OUT_ACT1_Pin};
+
+StepperMotor Actuator2 = {.STEP_Port = STEP_OUT_ACT2_GPIO_Port,
+                          .STEP_Pin = STEP_OUT_ACT2_Pin,
+
+                          .DIR_Port = DIR_OUT_ACT2_GPIO_Port,
+                          .DIR_Pin = DIR_OUT_ACT2_Pin};
+
+StepperMotor Actuator3 = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
+                          .STEP_Pin = STEP_OUT_ACT3_Pin,
+
+                          .DIR_Port = DIR_OUT_ACT3_GPIO_Port,
+                          .DIR_Pin = DIR_OUT_ACT3_Pin};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,19 +72,108 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void Stepper_Move(uint32_t pulses) {
+// void Stepper_Move(uint32_t pulses) {
+//   for (uint32_t i = 0; i < pulses; i++) {
+//     // STEP HIGH
+//     HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_SET);
+
+//     HAL_Delay(1);
+
+//     // STEP LOW
+//     HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_RESET);
+
+//     HAL_Delay(1);
+//   }
+// }
+
+void Stepper_Move_Select(StepperMotor *motor, GPIO_PinState direction,
+                  uint32_t pulses) {
+  HAL_GPIO_WritePin(motor->DIR_Port, motor->DIR_Pin, direction);
+
+  HAL_Delay(1);
+
   for (uint32_t i = 0; i < pulses; i++) {
-    // STEP HIGH
-    HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(motor->STEP_Port, motor->STEP_Pin, GPIO_PIN_SET);
 
     HAL_Delay(1);
 
-    // STEP LOW
-    HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(motor->STEP_Port, motor->STEP_Pin, GPIO_PIN_RESET);
 
     HAL_Delay(1);
   }
 }
+
+void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
+                   StepperMotor *motor2, GPIO_PinState dir2, uint32_t steps2,
+                   StepperMotor *motor3, GPIO_PinState dir3, uint32_t steps3) {
+  /* ---------------------------------
+     Set directions first
+     --------------------------------- */
+
+  HAL_GPIO_WritePin(motor1->DIR_Port, motor1->DIR_Pin, dir1);
+
+  HAL_GPIO_WritePin(motor2->DIR_Port, motor2->DIR_Pin, dir2);
+
+  HAL_GPIO_WritePin(motor3->DIR_Port, motor3->DIR_Pin, dir3);
+
+  HAL_Delay(1);
+
+  /* ---------------------------------
+     Find largest requested step count
+     --------------------------------- */
+
+  uint32_t maxSteps = steps1;
+
+  if (steps2 > maxSteps)
+    maxSteps = steps2;
+
+  if (steps3 > maxSteps)
+    maxSteps = steps3;
+
+  /* ---------------------------------
+     Generate steps simultaneously
+     --------------------------------- */
+
+  for (uint32_t i = 0; i < maxSteps; i++) {
+    /*
+     * Raise STEP only for motors
+     * which still need to move.
+     */
+
+    if (i < steps1) {
+      HAL_GPIO_WritePin(motor1->STEP_Port, motor1->STEP_Pin, GPIO_PIN_SET);
+    }
+
+    if (i < steps2) {
+      HAL_GPIO_WritePin(motor2->STEP_Port, motor2->STEP_Pin, GPIO_PIN_SET);
+    }
+
+    if (i < steps3) {
+      HAL_GPIO_WritePin(motor3->STEP_Port, motor3->STEP_Pin, GPIO_PIN_SET);
+    }
+
+    HAL_Delay(1);
+
+    /*
+     * Bring STEP signals LOW
+     */
+
+    if (i < steps1) {
+      HAL_GPIO_WritePin(motor1->STEP_Port, motor1->STEP_Pin, GPIO_PIN_RESET);
+    }
+
+    if (i < steps2) {
+      HAL_GPIO_WritePin(motor2->STEP_Port, motor2->STEP_Pin, GPIO_PIN_RESET);
+    }
+
+    if (i < steps3) {
+      HAL_GPIO_WritePin(motor3->STEP_Port, motor3->STEP_Pin, GPIO_PIN_RESET);
+    }
+
+    HAL_Delay(1);
+  }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -134,31 +238,20 @@ int main(void)
     // ============================================
     // Direction 1
     // ============================================
+    Stepper_Move3(&Actuator1, GPIO_PIN_SET, 200, &Actuator2, GPIO_PIN_SET, 200,
+                  &Actuator3, GPIO_PIN_SET, 200);
 
-    HAL_GPIO_WritePin(DIR_OUT_GPIO_Port, DIR_OUT_Pin, GPIO_PIN_SET);
-
-    // Give DM542 time to register direction
-    HAL_Delay(10);
-
-    // Send 800 STEP pulses
-    Stepper_Move(200);
-
-    // Stop for 2 seconds
-    HAL_Delay(2000);
+    // Stop for 1 seconds
+    HAL_Delay(1000);
 
     // ============================================
     // Direction 2
     // ============================================
+    Stepper_Move3(&Actuator1, GPIO_PIN_RESET, 200, &Actuator2, GPIO_PIN_RESET, 200,
+                  &Actuator3, GPIO_PIN_RESET, 200);
 
-    HAL_GPIO_WritePin(DIR_OUT_GPIO_Port, DIR_OUT_Pin, GPIO_PIN_RESET);
-
-    HAL_Delay(10);
-
-    // Send 800 STEP pulses
-    Stepper_Move(200);
-
-    // Stop for 2 seconds
-    HAL_Delay(2000);
+    // Stop for 1 seconds
+    HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -244,24 +337,24 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(DIR_OUT_GPIO_Port, DIR_OUT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOG, DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : STEP_OUT_Pin */
-  GPIO_InitStruct.Pin = STEP_OUT_Pin;
+  /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT2_Pin */
+  GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(STEP_OUT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : DIR_OUT_Pin */
-  GPIO_InitStruct.Pin = DIR_OUT_Pin;
+  /*Configure GPIO pins : DIR_OUT_ACT3_Pin STEP_OUT_ACT1_Pin */
+  GPIO_InitStruct.Pin = DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(DIR_OUT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
