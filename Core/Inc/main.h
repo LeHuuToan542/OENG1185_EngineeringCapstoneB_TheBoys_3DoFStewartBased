@@ -64,10 +64,18 @@ typedef struct {
   GPIO_TypeDef *DIR_Port;
   uint16_t DIR_Pin;
 
+  double current_stroke_length_mm; // Current actuator stroke length in mm.
+
 } StepperMotor;
 
 void Stepper_Move_Select(StepperMotor *motor, GPIO_PinState direction,
-                         uint32_t pulses);
+                         uint32_t pulses);     
+void delay_us(uint16_t us);
+void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
+                   StepperMotor *motor2, GPIO_PinState dir2, uint32_t steps2,
+                   StepperMotor *motor3, GPIO_PinState dir3, uint32_t steps3);
+void simscape_ik(double Z, double roll, double pitch, double q[3]);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
