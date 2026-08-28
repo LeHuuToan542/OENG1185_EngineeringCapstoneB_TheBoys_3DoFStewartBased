@@ -21,16 +21,25 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "bno055_dfrobot.h"
+#include <math.h>
+#include <stdint.h>
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define PI 3.14159265358979323846
+#define MOTOR_STEPS_PER_REV 200.0
+#define MICROSTEP 1
+#define MM_PER_REV 12.0
 
+#define STEPS_PER_MM ((MOTOR_STEPS_PER_REV * MICROSTEP) / MM_PER_REV)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,70 +51,297 @@
 
 COM_InitTypeDef BspCOMInit;
 
+I2C_HandleTypeDef hi2c1;
+
+TIM_HandleTypeDef htim1;
+
 /* USER CODE BEGIN PV */
 StepperMotor Actuator1 = {.STEP_Port = STEP_OUT_ACT1_GPIO_Port,
                           .STEP_Pin = STEP_OUT_ACT1_Pin,
 
                           .DIR_Port = DIR_OUT_ACT1_GPIO_Port,
-                          .DIR_Pin = DIR_OUT_ACT1_Pin};
+                          .DIR_Pin = DIR_OUT_ACT1_Pin,
+
+                          .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
 StepperMotor Actuator2 = {.STEP_Port = STEP_OUT_ACT2_GPIO_Port,
                           .STEP_Pin = STEP_OUT_ACT2_Pin,
 
                           .DIR_Port = DIR_OUT_ACT2_GPIO_Port,
-                          .DIR_Pin = DIR_OUT_ACT2_Pin};
+                          .DIR_Pin = DIR_OUT_ACT2_Pin,
+                          .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
 StepperMotor Actuator3 = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
                           .STEP_Pin = STEP_OUT_ACT3_Pin,
 
                           .DIR_Port = DIR_OUT_ACT3_GPIO_Port,
-                          .DIR_Pin = DIR_OUT_ACT3_Pin};
+                          .DIR_Pin = DIR_OUT_ACT3_Pin,
+                          .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
+
+double q[3];
+
+double Z = 50;
+double roll = 0;
+double pitch = 0;
+
+static BNO055_t bno;
+static BNO055_Euler_t bno_euler;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MPU_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
 // void Stepper_Move(uint32_t pulses) {
 //   for (uint32_t i = 0; i < pulses; i++) {
 //     // STEP HIGH
 //     HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_SET);
-
 //     HAL_Delay(1);
-
 //     // STEP LOW
 //     HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_RESET);
-
 //     HAL_Delay(1);
 //   }
 // }
 
-void Stepper_Move_Select(StepperMotor *motor, GPIO_PinState direction,
-                  uint32_t pulses) {
-  HAL_GPIO_WritePin(motor->DIR_Port, motor->DIR_Pin, direction);
+// void Stepper_Move_Select(StepperMotor *motor, GPIO_PinState direction,
+//                   uint32_t pulses) {
+//   HAL_GPIO_WritePin(motor->DIR_Port, motor->DIR_Pin, direction);
+//   HAL_Delay(1);
+//   for (uint32_t i = 0; i < pulses; i++) {
+//     HAL_GPIO_WritePin(motor->STEP_Port, motor->STEP_Pin, GPIO_PIN_SET);
+//     HAL_Delay(1);
+//     HAL_GPIO_WritePin(motor->STEP_Port, motor->STEP_Pin, GPIO_PIN_RESET);
+//     HAL_Delay(1);
+//   }
+// }
 
-  HAL_Delay(1);
+void simscape_ik(double Z, double roll, double pitch, double q[3]) {
+  /* ================================================================
+   * 1. Geometry
+   * ================================================================ */
 
-  for (uint32_t i = 0; i < pulses; i++) {
-    HAL_GPIO_WritePin(motor->STEP_Port, motor->STEP_Pin, GPIO_PIN_SET);
+  const double r = 100.0;             // Platform/base radius [mm]
+  const double stroke_length = 200.0; // Actuator stroke specification [mm]
 
-    HAL_Delay(1);
+  const double L_resting = 125.0 + stroke_length;
+  const double stroke_home = 0.0;
 
-    HAL_GPIO_WritePin(motor->STEP_Port, motor->STEP_Pin, GPIO_PIN_RESET);
+  /* ================================================================
+   * 2. Input clamping
+   * ================================================================ */
 
-    HAL_Delay(1);
+  const double max_tilt_deg = 25.0;
+
+  double total_tilt = sqrt((roll * roll) + (pitch * pitch));
+
+  /*
+   * Limit combined roll/pitch vector magnitude to 25 degrees.
+   */
+  if ((total_tilt > max_tilt_deg) && (total_tilt > 0.0)) {
+    double scale = max_tilt_deg / total_tilt;
+
+    roll *= scale;
+    pitch *= scale;
+  }
+
+  /*
+   * Limit Z to +/-40 mm.
+   */
+  double z_rel_clamped = Z;
+
+  if (z_rel_clamped > 40.0) {
+    z_rel_clamped = 40.0;
+  } else if (z_rel_clamped < -40.0) {
+    z_rel_clamped = -40.0;
+  }
+
+  /*
+   * Convert degrees to radians.
+   */
+  double rad_roll = roll * (PI / 180.0);
+  double rad_pitch = pitch * (PI / 180.0);
+
+  /* ================================================================
+   * 3. Orientation matrices
+   *
+   * R_sb = Ry * Rx
+   * ================================================================ */
+
+  double Rx[3][3] = {{1.0, 0.0, 0.0},
+
+                     {0.0, cos(rad_roll), -sin(rad_roll)},
+
+                     {0.0, sin(rad_roll), cos(rad_roll)}};
+
+  double Ry[3][3] = {{cos(rad_pitch), 0.0, sin(rad_pitch)},
+
+                     {0.0, 1.0, 0.0},
+
+                     {-sin(rad_pitch), 0.0, cos(rad_pitch)}};
+
+  /*
+   * R_sb = Ry * Rx
+   */
+  double R_sb[3][3];
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      R_sb[i][j] = 0.0;
+
+      for (int k = 0; k < 3; k++) {
+        R_sb[i][j] += Ry[i][k] * Rx[k][j];
+      }
+    }
+  }
+
+  /* ================================================================
+   * 4. Joint positions
+   *
+   * Joint arrangement:
+   *
+   *        actuator 1
+   *            0 deg
+   *
+   *     actuator 3       actuator 2
+   *        240 deg          120 deg
+   *
+   * ================================================================ */
+
+  double angles_deg[3] = {0.0, 120.0, 240.0};
+
+  double a[3][3];
+  double b_local[3][3];
+
+  for (int i = 0; i < 3; i++) {
+    double angle_rad = angles_deg[i] * (PI / 180.0);
+
+    /*
+     * Each column represents one joint:
+     *
+     * a[0][i] = X
+     * a[1][i] = Y
+     * a[2][i] = Z
+     */
+    a[0][i] = r * cos(angle_rad);
+    a[1][i] = r * sin(angle_rad);
+    a[2][i] = 0.0;
+
+    /*
+     * MATLAB:
+     *
+     * b_local = a;
+     */
+    b_local[0][i] = a[0][i];
+    b_local[1][i] = a[1][i];
+    b_local[2][i] = a[2][i];
+  }
+
+  /* ================================================================
+   * Rotate platform joint vectors:
+   *
+   * u = R_sb * b_local
+   * ================================================================ */
+
+  double u[3][3];
+
+  for (int joint = 0; joint < 3; joint++) {
+    for (int row = 0; row < 3; row++) {
+      u[row][joint] = 0.0;
+
+      for (int k = 0; k < 3; k++) {
+        u[row][joint] += R_sb[row][k] * b_local[k][joint];
+      }
+    }
+  }
+
+  /* ================================================================
+   * 5. Platform position
+   * ================================================================ */
+
+  double Z_abs = L_resting + stroke_home + z_rel_clamped;
+
+  /*
+   * MATLAB:
+   *
+   * Px = -(u(1,1) + u(1,2) + u(1,3)) / 3
+   * Py = -(u(2,1) + u(2,2) + u(2,3)) / 3
+   */
+  double Px = -(u[0][0] + u[0][1] + u[0][2]) / 3.0;
+
+  double Py = -(u[1][0] + u[1][1] + u[1][2]) / 3.0;
+
+  double P[3] = {Px, Py, Z_abs};
+
+  /* ================================================================
+   * 6. Calculate actuator lengths
+   * ================================================================ */
+
+  for (int joint = 0; joint < 3; joint++) {
+    /*
+     * MATLAB:
+     *
+     * b_air = P + u;
+     *
+     * d_leg = b_air - a;
+     */
+
+    double b_air_x = P[0] + u[0][joint];
+    double b_air_y = P[1] + u[1][joint];
+    double b_air_z = P[2] + u[2][joint];
+
+    double d_leg_x = b_air_x - a[0][joint];
+
+    double d_leg_y = b_air_y - a[1][joint];
+
+    double d_leg_z = b_air_z - a[2][joint];
+
+    /*
+     * MATLAB:
+     *
+     * L = sqrt(sum(d_leg.^2, 1))
+     */
+    double L =
+        sqrt((d_leg_x * d_leg_x) + (d_leg_y * d_leg_y) + (d_leg_z * d_leg_z));
+
+    /*
+     * Convert total leg length to actuator stroke.
+     */
+    q[joint] = L - L_resting;
+
+    /*
+     * Safe stroke clamp:
+     *
+     * MATLAB:
+     * q = max(min(q, 150), 0);
+     */
+    if (q[joint] > 150.0) {
+      q[joint] = 150.0;
+    } else if (q[joint] < 0.0) {
+      q[joint] = 0.0;
+    }
   }
 }
 
+void delay_us(uint16_t us) {
+  __HAL_TIM_SET_COUNTER(&htim1, 0); // set the counter value a 0
+  while ((uint16_t)__HAL_TIM_GET_COUNTER(&htim1) < us); // wait for the counter to reach the us input in the parameter
+}
+
+
 void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
                    StepperMotor *motor2, GPIO_PinState dir2, uint32_t steps2,
-                   StepperMotor *motor3, GPIO_PinState dir3, uint32_t steps3) {
+                   StepperMotor *motor3, GPIO_PinState dir3, uint32_t steps3) 
+                   {
   /* ---------------------------------
      Set directions first
      --------------------------------- */
@@ -116,7 +352,8 @@ void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
 
   HAL_GPIO_WritePin(motor3->DIR_Port, motor3->DIR_Pin, dir3);
 
-  HAL_Delay(1);
+  //HAL_Delay(1);
+  delay_us(500); 
 
   /* ---------------------------------
      Find largest requested step count
@@ -152,13 +389,15 @@ void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
       HAL_GPIO_WritePin(motor3->STEP_Port, motor3->STEP_Pin, GPIO_PIN_SET);
     }
 
-    HAL_Delay(1);
+    //HAL_Delay(1);
+    delay_us(500); 
+    
 
-    /*
-     * Bring STEP signals LOW
-     */
+        /*
+         * Bring STEP signals LOW
+         */
 
-    if (i < steps1) {
+        if (i < steps1) {
       HAL_GPIO_WritePin(motor1->STEP_Port, motor1->STEP_Pin, GPIO_PIN_RESET);
     }
 
@@ -170,9 +409,83 @@ void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
       HAL_GPIO_WritePin(motor3->STEP_Port, motor3->STEP_Pin, GPIO_PIN_RESET);
     }
 
-    HAL_Delay(1);
+    delay_us(500);
+
   }
 }
+
+void MoveActuatorsToTarget(double q[3]) {
+  /*
+   * q[] contains ABSOLUTE TARGET STROKE positions:
+   *
+   * q[0] -> target stroke of actuator 1 [mm]
+   * q[1] -> target stroke of actuator 2 [mm]
+   * q[2] -> target stroke of actuator 3 [mm]
+   */
+
+  double move1 = q[0] - Actuator1.current_stroke_length_mm;
+
+  double move2 = q[1] - Actuator2.current_stroke_length_mm;
+
+  double move3 = q[2] - Actuator3.current_stroke_length_mm;
+
+  /*
+   * Positive movement = extend
+   * Negative movement = retract
+   *
+   * For now assuming GPIO_PIN_SET means EXTEND.
+   */
+  GPIO_PinState dir1 = (move1 >= 0.0) ? GPIO_PIN_SET : GPIO_PIN_RESET;
+
+  GPIO_PinState dir2 = (move2 >= 0.0) ? GPIO_PIN_SET : GPIO_PIN_RESET;
+
+  GPIO_PinState dir3 = (move3 >= 0.0) ? GPIO_PIN_SET : GPIO_PIN_RESET;
+
+  /*
+   * Convert required movement [mm] to step pulses.
+   */
+  uint32_t steps1 = (uint32_t)(fabs(move1) * STEPS_PER_MM + 0.5);
+
+  uint32_t steps2 = (uint32_t)(fabs(move2) * STEPS_PER_MM + 0.5);
+
+  uint32_t steps3 = (uint32_t)(fabs(move3) * STEPS_PER_MM + 0.5);
+
+  /*
+   * Physically move all three actuators.
+   */
+  Stepper_Move3(&Actuator1, dir1, steps1, &Actuator2, dir2, steps2, &Actuator3,
+                dir3, steps3);
+
+  /*
+   * Update software-estimated positions.
+   *
+   * We use the number of steps actually commanded rather
+   * than simply setting current position equal to q.
+   */
+
+  double moved1 = (double)steps1 / STEPS_PER_MM;
+
+  double moved2 = (double)steps2 / STEPS_PER_MM;
+
+  double moved3 = (double)steps3 / STEPS_PER_MM;
+
+  if (dir1 == GPIO_PIN_SET)
+    Actuator1.current_stroke_length_mm += moved1;
+  else
+    Actuator1.current_stroke_length_mm -= moved1;
+
+  if (dir2 == GPIO_PIN_SET)
+    Actuator2.current_stroke_length_mm += moved2;
+  else
+    Actuator2.current_stroke_length_mm -= moved2;
+
+  if (dir3 == GPIO_PIN_SET)
+    Actuator3.current_stroke_length_mm += moved3;
+  else
+    Actuator3.current_stroke_length_mm -= moved3;
+}
+
+
 
 /* USER CODE END 0 */
 
@@ -208,6 +521,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM1_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -233,25 +548,50 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  HAL_TIM_Base_Start(&htim1); // start the Timer1
+
+  BNO055_Attach(&bno, &hi2c1, &hcom_uart[COM1],
+                BNO055_I2C_ADDRESS_7BIT_DEFAULT);
+
+  BNO055_Status_t status;
+
+  status = BNO055_Begin(&bno);
+
+  if (status != BNO055_STATUS_OK) {
+    BNO055_PrintStatus(&bno, status);
+  }
+
   while (1)
   {
-    // ============================================
-    // Direction 1
-    // ============================================
-    Stepper_Move3(&Actuator1, GPIO_PIN_SET, 200, &Actuator2, GPIO_PIN_SET, 200,
-                  &Actuator3, GPIO_PIN_SET, 200);
+    // Stepper_Move3(&Actuator1, GPIO_PIN_SET, 200, &Actuator2, GPIO_PIN_SET, 200,
+    //               &Actuator3, GPIO_PIN_SET, 200);
+    // HAL_Delay(2);
+    // Stepper_Move3(&Actuator1, GPIO_PIN_RESET, 200, &Actuator2, GPIO_PIN_RESET, 200,
+    //               &Actuator3, GPIO_PIN_RESET, 200);
+    // HAL_Delay(2);
+    //  simscape_ik(Z, roll, pitch, q);
+    //  MoveActuatorsToTarget(q);
 
-    // Stop for 1 seconds
-    HAL_Delay(1000);
 
-    // ============================================
-    // Direction 2
-    // ============================================
-    Stepper_Move3(&Actuator1, GPIO_PIN_RESET, 200, &Actuator2, GPIO_PIN_RESET, 200,
-                  &Actuator3, GPIO_PIN_RESET, 200);
+      if (BNO055_ReadEuler(&bno, &bno_euler) == BNO055_STATUS_OK) {
+        BNO055_PrintEuler(&bno, &bno_euler);
+        roll = bno_euler.roll;
+        pitch = bno_euler.pitch;
+        simscape_ik(Z, roll, pitch, q);
+        MoveActuatorsToTarget(q);
+      }
+    
+    // Test_TiltAllDirections();
 
-    // Stop for 1 seconds
-    HAL_Delay(1000);
+    // Stop for 100 ms
+    // HAL_Delay(100);
+
+    // HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_SET);
+    // delay_us(3); 
+    // HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
+   
+    // HAL_GPIO_TogglePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin);
+    // delay_us(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -319,6 +659,101 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x307075B1;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 240-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -335,6 +770,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin, GPIO_PIN_RESET);
