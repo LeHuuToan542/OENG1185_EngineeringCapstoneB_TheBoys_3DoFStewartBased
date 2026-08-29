@@ -24,6 +24,7 @@
 #include "bno055_dfrobot.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 /* USER CODE END Includes */
 
@@ -86,6 +87,9 @@ double pitch = 0;
 
 static BNO055_t bno;
 static BNO055_Euler_t bno_euler;
+
+static char serial_rx_buffer[64];
+static uint8_t serial_rx_index = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,18 +104,6 @@ static void MX_I2C1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-
-// void Stepper_Move(uint32_t pulses) {
-//   for (uint32_t i = 0; i < pulses; i++) {
-//     // STEP HIGH
-//     HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_SET);
-//     HAL_Delay(1);
-//     // STEP LOW
-//     HAL_GPIO_WritePin(STEP_OUT_GPIO_Port, STEP_OUT_Pin, GPIO_PIN_RESET);
-//     HAL_Delay(1);
-//   }
-// }
 
 // void Stepper_Move_Select(StepperMotor *motor, GPIO_PinState direction,
 //                   uint32_t pulses) {
@@ -485,7 +477,113 @@ void MoveActuatorsToTarget(double q[3]) {
     Actuator3.current_stroke_length_mm -= moved3;
 }
 
+int ParsePoseCommand(char *text, double *Z_cmd, double *roll_cmd,
+                     double *pitch_cmd) {
+  char *end;
 
+  /*
+   * Read Z
+   */
+  double z = strtod(text, &end);
+
+  if (end == text || *end != ',') {
+    return 0;
+  }
+
+  /*
+   * Read roll
+   */
+  double r = strtod(end + 1, &end);
+
+  if (*end != ',') {
+    return 0;
+  }
+
+  /*
+   * Read pitch
+   */
+  double p = strtod(end + 1, &end);
+
+  /*
+   * Check that nothing invalid remains.
+   */
+  while (*end == ' ') {
+    end++;
+  }
+
+  if (*end != '\0') {
+    return 0;
+  }
+
+  /*
+   * Command is valid.
+   */
+  *Z_cmd = z;
+  *roll_cmd = r;
+  *pitch_cmd = p;
+
+  return 1;
+}
+
+int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
+  uint8_t rx_byte;
+
+  /*
+   * Check whether one byte has arrived.
+   *
+   * 1 ms timeout means this does not block the program
+   * for very long.
+   */
+  if (HAL_UART_Receive(&hcom_uart[COM1], &rx_byte, 1, 1) != HAL_OK) {
+    return 0;
+  }
+
+  /*
+   * ENTER received.
+   *
+   * Accept both CR and LF because different terminals
+   * use different line endings.
+   */
+  if ((rx_byte == '\r') || (rx_byte == '\n')) {
+    /*
+     * Ignore empty line.
+     *
+     * This is useful when the PC sends CR+LF.
+     */
+    if (serial_rx_index == 0) {
+      return 0;
+    }
+
+    /*
+     * Terminate C string.
+     */
+    serial_rx_buffer[serial_rx_index] = '\0';
+
+    serial_rx_index = 0;
+
+    /*
+     * Convert ASCII command into numbers.
+     */
+    return ParsePoseCommand(serial_rx_buffer, Z_cmd, roll_cmd, pitch_cmd);
+  }
+
+  /*
+   * Store received character.
+   */
+  if (serial_rx_index < (sizeof(serial_rx_buffer) - 1)) {
+    serial_rx_buffer[serial_rx_index] = (char)rx_byte;
+
+    serial_rx_index++;
+  } else {
+    /*
+     * Buffer overflow.
+     * Throw away command and start again.
+     */
+    serial_rx_index = 0;
+  }
+
+  return 0;
+}
 
 /* USER CODE END 0 */
 
@@ -561,37 +659,77 @@ int main(void)
     BNO055_PrintStatus(&bno, status);
   }
 
+char welcome_msg[] =
+    "\r\n"
+    "=== Stewart Platform Control ===\r\n"
+    "Enter command as:\r\n"
+    "Z,roll,pitch\r\n"
+    "\r\n"
+    "Example:\r\n"
+    "10,5,-3\r\n"
+    "\r\n"
+    "Z     = heave in mm\r\n"
+    "roll  = angle in degrees\r\n"
+    "pitch = angle in degrees\r\n"
+    "\r\n"
+    "Type command and press ENTER:\r\n> ";
+
+HAL_UART_Transmit(
+    &hcom_uart[COM1],
+    (uint8_t *)welcome_msg,
+    sizeof(welcome_msg) - 1,
+    HAL_MAX_DELAY
+);
+
+  double Z_cmd, roll_cmd, pitch_cmd;
   while (1)
   {
+
+    //TEST STEPPER MOVE - UNCOMMENT TO TEST
     // Stepper_Move3(&Actuator1, GPIO_PIN_SET, 200, &Actuator2, GPIO_PIN_SET, 200,
     //               &Actuator3, GPIO_PIN_SET, 200);
     // HAL_Delay(2);
     // Stepper_Move3(&Actuator1, GPIO_PIN_RESET, 200, &Actuator2, GPIO_PIN_RESET, 200,
     //               &Actuator3, GPIO_PIN_RESET, 200);
     // HAL_Delay(2);
-    //  simscape_ik(Z, roll, pitch, q);
-    //  MoveActuatorsToTarget(q);
 
+    // IMU CONTROL - UNCOMMENT TO USE IMU FOR CONTROL
+    // if (BNO055_ReadEuler(&bno, &bno_euler) == BNO055_STATUS_OK) {
+    //   BNO055_PrintEuler(&bno, &bno_euler);
+    //   roll = bno_euler.roll;
+    //   pitch = bno_euler.pitch;
+    //   simscape_ik(Z, roll, pitch, q);
+    //   MoveActuatorsToTarget(q);
+    // }
+  
+    //PuTTy CONTROL - UNCOMMENT TO USE PuTTy FOR CONTROL
+    // if (Serial_ReadPoseCommand(&Z_cmd, &roll_cmd, &pitch_cmd)) {
+    //   /*
+    //    * Save new desired platform pose.
+    //    */
+    //   Z = Z_cmd;
+    //   roll = roll_cmd;
+    //   pitch = pitch_cmd;
+    //   char msg[] = "POSE COMMAND RECEIVED\r\n";
+    //   HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
+    //   simscape_ik(Z, roll, pitch, q);
+    //   MoveActuatorsToTarget(q);
+    //   char prompt[] = "\r\nEnter next command:\r\n> ";
+    //   HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)prompt, sizeof(prompt) - 1, HAL_MAX_DELAY);
+    // }
 
-      if (BNO055_ReadEuler(&bno, &bno_euler) == BNO055_STATUS_OK) {
-        BNO055_PrintEuler(&bno, &bno_euler);
-        roll = bno_euler.roll;
-        pitch = bno_euler.pitch;
-        simscape_ik(Z, roll, pitch, q);
-        MoveActuatorsToTarget(q);
-      }
-    
-    // Test_TiltAllDirections();
+    //BUTTON testing
+    GPIO_PinState buttonState =
+    HAL_GPIO_ReadPin(START_BUTTON_GPIO_Port, START_BUTTON_Pin);
 
-    // Stop for 100 ms
-    // HAL_Delay(100);
+    if (buttonState == GPIO_PIN_SET) {
+      /* Button pressed */
+      BSP_LED_On(LED_GREEN);
+    } else {
+      /* Button released */
+      BSP_LED_Off(LED_GREEN);
+    }
 
-    // HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_SET);
-    // delay_us(3); 
-    // HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
-   
-    // HAL_GPIO_TogglePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin);
-    // delay_us(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -767,6 +905,7 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
@@ -777,6 +916,12 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : START_BUTTON_Pin */
+  GPIO_InitStruct.Pin = START_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(START_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT2_Pin */
   GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin;

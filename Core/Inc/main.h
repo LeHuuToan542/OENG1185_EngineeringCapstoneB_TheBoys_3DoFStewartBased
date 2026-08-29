@@ -79,6 +79,8 @@ void simscape_ik(double Z, double roll, double pitch, double q[3]);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define START_BUTTON_Pin GPIO_PIN_3
+#define START_BUTTON_GPIO_Port GPIOF
 #define STEP_OUT_ACT3_Pin GPIO_PIN_9
 #define STEP_OUT_ACT3_GPIO_Port GPIOE
 #define DIR_OUT_ACT2_Pin GPIO_PIN_11
