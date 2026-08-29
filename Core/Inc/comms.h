@@ -40,6 +40,9 @@ GPIO_PinState Comms_ReadButton(void);
 /* Drive the alarm/status LED. */
 void Comms_SetAlarmLED(GPIO_PinState state);
 
+/* Mirror the start/test button state onto the alarm/status LED. */
+void Comms_UpdateAlarmLED(void);
+
 #ifdef __cplusplus
 }
 #endif

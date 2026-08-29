@@ -21,9 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ik.h"
-#include "drive.h"
 #include "comms.h"
+#include "control.h"
 
 /* USER CODE END Includes */
 
@@ -51,11 +50,7 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
-double q[3];
 
-double Z = 50;
-double roll = 0;
-double pitch = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -138,7 +133,6 @@ int main(void)
 
   Comms_SendWelcomeMessage();
 
-  double Z_cmd, roll_cmd, pitch_cmd;
   while (1)
   {
 
@@ -150,38 +144,10 @@ int main(void)
     //               &Actuator3, GPIO_PIN_RESET, 200);
     // HAL_Delay(2);
 
-    //IMU CONTROL - UNCOMMENT TO USE IMU FOR CONTROL
-    if (Comms_ReadIMU(&roll, &pitch)) {
-      simscape_ik(Z, roll, pitch, q);
-      MoveActuatorsToTarget(q);
-    }
-
-    //PuTTy CONTROL - UNCOMMENT TO USE PuTTy FOR CONTROL
-    // if (Serial_ReadPoseCommand(&Z_cmd, &roll_cmd, &pitch_cmd)) {
-    //   /*
-    //    * Save new desired platform pose.
-    //    */
-    //   Z = Z_cmd;
-    //   roll = roll_cmd;
-    //   pitch = pitch_cmd;
-    //   char msg[] = "POSE COMMAND RECEIVED\r\n";
-    //   HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-    //   simscape_ik(Z, roll, pitch, q);
-    //   MoveActuatorsToTarget(q);
-    //   char prompt[] = "\r\nEnter next command:\r\n> ";
-    //   HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)prompt, sizeof(prompt) - 1, HAL_MAX_DELAY);
-    // }
+    Control_Update();
 
     //BUTTON testing
-    GPIO_PinState buttonState = Comms_ReadButton();
-
-    if (buttonState == GPIO_PIN_SET) {
-      /* Button pressed */
-      Comms_SetAlarmLED(GPIO_PIN_SET);
-    } else {
-      /* Button released */
-      Comms_SetAlarmLED(GPIO_PIN_RESET);
-    }
+    Comms_UpdateAlarmLED();
 
     /* USER CODE END WHILE */
 

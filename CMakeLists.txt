@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/ik.c
     Core/Src/drive.c
     Core/Src/comms.c
+    Core/Src/control.c
     )
 
 # Add include paths

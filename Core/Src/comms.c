@@ -183,3 +183,15 @@ void Comms_SetAlarmLED(GPIO_PinState state) {
     BSP_LED_Off(LED_GREEN);
   }
 }
+
+void Comms_UpdateAlarmLED(void) {
+  GPIO_PinState buttonState = Comms_ReadButton();
+
+  if (buttonState == GPIO_PIN_SET) {
+    /* Button pressed */
+    Comms_SetAlarmLED(GPIO_PIN_SET);
+  } else {
+    /* Button released */
+    Comms_SetAlarmLED(GPIO_PIN_RESET);
+  }
+}
