@@ -57,7 +57,7 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
-StepperMotor Actuator1 = {.STEP_Port = STEP_OUT_ACT1_GPIO_Port,
+StepperMotor FrontActuator = {.STEP_Port = STEP_OUT_ACT1_GPIO_Port,
                           .STEP_Pin = STEP_OUT_ACT1_Pin,
 
                           .DIR_Port = DIR_OUT_ACT1_GPIO_Port,
@@ -65,14 +65,14 @@ StepperMotor Actuator1 = {.STEP_Port = STEP_OUT_ACT1_GPIO_Port,
 
                           .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
-StepperMotor Actuator2 = {.STEP_Port = STEP_OUT_ACT2_GPIO_Port,
+StepperMotor BackRightActuator = {.STEP_Port = STEP_OUT_ACT2_GPIO_Port,
                           .STEP_Pin = STEP_OUT_ACT2_Pin,
 
                           .DIR_Port = DIR_OUT_ACT2_GPIO_Port,
                           .DIR_Pin = DIR_OUT_ACT2_Pin,
                           .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
-StepperMotor Actuator3 = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
+StepperMotor BackLeftActuator = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
                           .STEP_Pin = STEP_OUT_ACT3_Pin,
 
                           .DIR_Port = DIR_OUT_ACT3_GPIO_Port,
@@ -415,11 +415,11 @@ void MoveActuatorsToTarget(double q[3]) {
    * q[2] -> target stroke of actuator 3 [mm]
    */
 
-  double move1 = q[0] - Actuator1.current_stroke_length_mm;
+  double move1 = q[0] - FrontActuator.current_stroke_length_mm;
 
-  double move2 = q[1] - Actuator2.current_stroke_length_mm;
+  double move2 = q[1] - BackRightActuator.current_stroke_length_mm;
 
-  double move3 = q[2] - Actuator3.current_stroke_length_mm;
+  double move3 = q[2] - BackLeftActuator.current_stroke_length_mm;
 
   /*
    * Positive movement = extend
@@ -445,7 +445,7 @@ void MoveActuatorsToTarget(double q[3]) {
   /*
    * Physically move all three actuators.
    */
-  Stepper_Move3(&Actuator1, dir1, steps1, &Actuator2, dir2, steps2, &Actuator3,
+  Stepper_Move3(&FrontActuator, dir1, steps1, &BackRightActuator, dir2, steps2, &BackLeftActuator,
                 dir3, steps3);
 
   /*
@@ -462,19 +462,19 @@ void MoveActuatorsToTarget(double q[3]) {
   double moved3 = (double)steps3 / STEPS_PER_MM;
 
   if (dir1 == GPIO_PIN_SET)
-    Actuator1.current_stroke_length_mm += moved1;
+    FrontActuator.current_stroke_length_mm += moved1;
   else
-    Actuator1.current_stroke_length_mm -= moved1;
+    FrontActuator.current_stroke_length_mm -= moved1;
 
   if (dir2 == GPIO_PIN_SET)
-    Actuator2.current_stroke_length_mm += moved2;
+    BackRightActuator.current_stroke_length_mm += moved2;
   else
-    Actuator2.current_stroke_length_mm -= moved2;
+    BackRightActuator.current_stroke_length_mm -= moved2;
 
   if (dir3 == GPIO_PIN_SET)
-    Actuator3.current_stroke_length_mm += moved3;
+    BackLeftActuator.current_stroke_length_mm += moved3;
   else
-    Actuator3.current_stroke_length_mm -= moved3;
+    BackLeftActuator.current_stroke_length_mm -= moved3;
 }
 
 int ParsePoseCommand(char *text, double *Z_cmd, double *roll_cmd,
@@ -693,14 +693,14 @@ HAL_UART_Transmit(
     //               &Actuator3, GPIO_PIN_RESET, 200);
     // HAL_Delay(2);
 
-    // IMU CONTROL - UNCOMMENT TO USE IMU FOR CONTROL
-    // if (BNO055_ReadEuler(&bno, &bno_euler) == BNO055_STATUS_OK) {
-    //   BNO055_PrintEuler(&bno, &bno_euler);
-    //   roll = bno_euler.roll;
-    //   pitch = bno_euler.pitch;
-    //   simscape_ik(Z, roll, pitch, q);
-    //   MoveActuatorsToTarget(q);
-    // }
+    //IMU CONTROL - UNCOMMENT TO USE IMU FOR CONTROL
+    if (BNO055_ReadEuler(&bno, &bno_euler) == BNO055_STATUS_OK) {
+      BNO055_PrintEuler(&bno, &bno_euler);
+      roll = bno_euler.roll;
+      pitch = bno_euler.pitch;
+      simscape_ik(Z, roll, pitch, q);
+      MoveActuatorsToTarget(q);
+    }
   
     //PuTTy CONTROL - UNCOMMENT TO USE PuTTy FOR CONTROL
     // if (Serial_ReadPoseCommand(&Z_cmd, &roll_cmd, &pitch_cmd)) {
