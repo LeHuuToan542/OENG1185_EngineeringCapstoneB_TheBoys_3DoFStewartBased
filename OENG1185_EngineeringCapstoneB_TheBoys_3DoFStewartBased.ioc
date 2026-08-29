@@ -9,6 +9,7 @@ CORTEX_M7.IPParameters=CPU_ICache,CPU_DCache,MPU_Control,default_mode_Activation
 CORTEX_M7.MPU_Control=MPU_PRIVILEGED_DEFAULT
 CORTEX_M7.default_mode_Activation=1
 File.Version=6
+GPIO.groupedBy=Group By Peripherals
 I2C1.IPParameters=Timing
 I2C1.Timing=0x307075B1
 KeepUserPlacement=false
