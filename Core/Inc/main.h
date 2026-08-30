@@ -89,6 +89,8 @@ void simscape_ik(double Z, double roll, double pitch, double q[3]);
 #define DIR_OUT_ACT1_GPIO_Port GPIOE
 #define STEP_OUT_ACT2_Pin GPIO_PIN_14
 #define STEP_OUT_ACT2_GPIO_Port GPIOE
+#define STOP_BUTTON_Pin GPIO_PIN_15
+#define STOP_BUTTON_GPIO_Port GPIOD
 #define DIR_OUT_ACT3_Pin GPIO_PIN_12
 #define DIR_OUT_ACT3_GPIO_Port GPIOG
 #define STEP_OUT_ACT1_Pin GPIO_PIN_14
