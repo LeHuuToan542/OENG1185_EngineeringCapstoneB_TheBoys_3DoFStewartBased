@@ -46,6 +46,10 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/bno055_dfrobot.c
+    Core/Src/ik.c
+    Core/Src/drive.c
+    Core/Src/comms.c
+    Core/Src/control.c
     )
 
 # Add include paths
