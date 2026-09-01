@@ -27,10 +27,11 @@ void Comms_SendWelcomeMessage(void);
 int Comms_ReadIMU(double *roll, double *pitch);
 
 /*
- * Parse a "Z,roll,pitch" command received over PuTTY.
- * Returns 1 and writes *Z_cmd, *roll_cmd, and *pitch_cmd on a complete,
- * valid command, 0 otherwise (including while a command is still being
- * typed).
+ * Read one line typed over PuTTY, if a complete line has arrived.
+ * Returns 1 and writes *Z_cmd, *roll_cmd, *pitch_cmd for a "Z,roll,pitch"
+ * command, 2 for the literal command "IMU" (switch to IMU mode), or 0
+ * otherwise (including while a command is still being typed, or on an
+ * unrecognized line).
  */
 int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd);
 

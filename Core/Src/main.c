@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "comms.h"
 #include "control.h"
+#include "drive.h"
 
 /* USER CODE END Includes */
 
@@ -137,12 +138,12 @@ int main(void)
   {
 
     //TEST STEPPER MOVE - UNCOMMENT TO TEST
-    // Stepper_Move3(&Actuator1, GPIO_PIN_SET, 200, &Actuator2, GPIO_PIN_SET, 200,
-    //               &Actuator3, GPIO_PIN_SET, 200);
-    // HAL_Delay(2);
-    // Stepper_Move3(&Actuator1, GPIO_PIN_RESET, 200, &Actuator2, GPIO_PIN_RESET, 200,
-    //               &Actuator3, GPIO_PIN_RESET, 200);
-    // HAL_Delay(2);
+    // Stepper_Move3(&FrontActuator, GPIO_PIN_SET, 200, &BackRightActuator, GPIO_PIN_SET, 200,
+    //               &BackLeftActuator, GPIO_PIN_SET, 200);
+    // HAL_Delay(200);
+    // Stepper_Move3(&FrontActuator, GPIO_PIN_RESET, 200, &BackRightActuator, GPIO_PIN_RESET, 200,
+    //               &BackLeftActuator, GPIO_PIN_RESET, 200);
+    // HAL_Delay(200);
 
     Control_Update();
 

@@ -9,9 +9,12 @@
 #include "comms.h"
 #include "bno055_dfrobot.h"
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 static BNO055_t bno;
 static BNO055_Euler_t bno_euler;
+static bool imu_ready = false;
 
 static char serial_rx_buffer[64];
 static uint8_t serial_rx_index = 0;
@@ -21,6 +24,8 @@ void Comms_Init(I2C_HandleTypeDef *hi2c) {
                 BNO055_I2C_ADDRESS_7BIT_DEFAULT);
 
   BNO055_Status_t status = BNO055_Begin(&bno);
+
+  imu_ready = (status == BNO055_STATUS_OK);
 
   if (status != BNO055_STATUS_OK) {
     BNO055_PrintStatus(&bno, status);
@@ -52,6 +57,16 @@ void Comms_SendWelcomeMessage(void) {
 }
 
 int Comms_ReadIMU(double *roll, double *pitch) {
+  /*
+   * Skip the I2C transaction entirely when the IMU never came up.
+   * Otherwise every loop iteration blocks for the full I2C timeout,
+   * which starves the polled UART read below and drops PuTTY bytes
+   * (including the terminating Enter).
+   */
+  if (!imu_ready) {
+    return 0;
+  }
+
   if (BNO055_ReadEuler(&bno, &bno_euler) != BNO055_STATUS_OK) {
     return 0;
   }
@@ -147,6 +162,18 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
     serial_rx_buffer[serial_rx_index] = '\0';
 
     serial_rx_index = 0;
+
+    /*
+     * Uppercase in place so the "IMU" keyword check is case-insensitive.
+     * Harmless to the numbers/commas ParsePoseCommand looks for below.
+     */
+    for (uint8_t i = 0; serial_rx_buffer[i] != '\0'; i++) {
+      serial_rx_buffer[i] = (char)toupper((unsigned char)serial_rx_buffer[i]);
+    }
+
+    if (strcmp(serial_rx_buffer, "IMU") == 0) {
+      return 2;
+    }
 
     /*
      * Convert ASCII command into numbers.
