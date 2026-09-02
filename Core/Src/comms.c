@@ -32,8 +32,17 @@ void Comms_Init(I2C_HandleTypeDef *hi2c) {
   }
 }
 
+void Comms_Print(const char *text) {
+  HAL_UART_Transmit(
+      &hcom_uart[COM1],
+      (uint8_t *)text,
+      (uint16_t)strlen(text),
+      HAL_MAX_DELAY
+  );
+}
+
 void Comms_SendWelcomeMessage(void) {
-  char welcome_msg[] =
+  Comms_Print(
       "\r\n"
       "=== Stewart Platform Control ===\r\n"
       "Enter command as:\r\n"
@@ -46,13 +55,7 @@ void Comms_SendWelcomeMessage(void) {
       "roll  = angle in degrees\r\n"
       "pitch = angle in degrees\r\n"
       "\r\n"
-      "Type command and press ENTER:\r\n> ";
-
-  HAL_UART_Transmit(
-      &hcom_uart[COM1],
-      (uint8_t *)welcome_msg,
-      sizeof(welcome_msg) - 1,
-      HAL_MAX_DELAY
+      "Type command and press ENTER:\r\n> "
   );
 }
 
@@ -177,8 +180,16 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
 
     /*
      * Convert ASCII command into numbers.
+     *
+     * A complete line that does not parse returns -1 so the caller can
+     * report it. Returning 0 here would be indistinguishable from
+     * "no complete line has arrived yet".
      */
-    return ParsePoseCommand(serial_rx_buffer, Z_cmd, roll_cmd, pitch_cmd);
+    if (ParsePoseCommand(serial_rx_buffer, Z_cmd, roll_cmd, pitch_cmd)) {
+      return 1;
+    }
+
+    return -1;
   }
 
   /*
@@ -197,28 +208,4 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
   }
 
   return 0;
-}
-
-GPIO_PinState Comms_ReadButton(void) {
-  return HAL_GPIO_ReadPin(START_BUTTON_GPIO_Port, START_BUTTON_Pin);
-}
-
-void Comms_SetAlarmLED(GPIO_PinState state) {
-  if (state == GPIO_PIN_SET) {
-    BSP_LED_On(LED_GREEN);
-  } else {
-    BSP_LED_Off(LED_GREEN);
-  }
-}
-
-void Comms_UpdateAlarmLED(void) {
-  GPIO_PinState buttonState = Comms_ReadButton();
-
-  if (buttonState == GPIO_PIN_SET) {
-    /* Button pressed */
-    Comms_SetAlarmLED(GPIO_PIN_SET);
-  } else {
-    /* Button released */
-    Comms_SetAlarmLED(GPIO_PIN_RESET);
-  }
 }

@@ -30,8 +30,7 @@ void Control_Update(void) {
 
   if (cmd == 2) {
     imu_mode = 1;
-    char msg[] = "\r\nIMU MODE ENABLED\r\n> ";
-    HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
+    Comms_Print("\r\nIMU MODE ENABLED\r\n> ");
   } else if (cmd == 1) {
     imu_mode = 0;
     /*
@@ -40,12 +39,12 @@ void Control_Update(void) {
     Z = Z_cmd;
     roll = roll_cmd;
     pitch = pitch_cmd;
-    char msg[] = "POSE COMMAND RECEIVED\r\n";
-    HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
+    Comms_Print("POSE COMMAND RECEIVED\r\n");
     simscape_ik(Z, roll, pitch, q);
     MoveActuatorsToTarget(q);
-    char prompt[] = "\r\nEnter next command:\r\n> ";
-    HAL_UART_Transmit(&hcom_uart[COM1], (uint8_t *)prompt, sizeof(prompt) - 1, HAL_MAX_DELAY);
+    Comms_Print("\r\nEnter next command:\r\n> ");
+  } else if (cmd == -1) {
+    Comms_Print("\r\nINVALID COMMAND. Expected Z,roll,pitch (e.g. 10,5,-3) or IMU\r\n> ");
   }
 
   if (imu_mode) {

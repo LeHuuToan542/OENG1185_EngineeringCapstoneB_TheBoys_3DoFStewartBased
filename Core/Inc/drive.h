@@ -22,6 +22,12 @@ extern "C" {
 
 #define STEPS_PER_MM ((MOTOR_STEPS_PER_REV * MICROSTEP) / MM_PER_REV)
 
+/* STEP pulse half-period [us]: one step takes 2 x this. */
+#define STEP_PULSE_US 500
+
+/* Number of actuators. */
+#define ACTUATOR_COUNT 3
+
 typedef struct {
   GPIO_TypeDef *STEP_Port;
   uint16_t STEP_Pin;
@@ -37,11 +43,18 @@ extern StepperMotor FrontActuator;
 extern StepperMotor BackRightActuator;
 extern StepperMotor BackLeftActuator;
 
+/* The three actuators in q[] order: front, back-right, back-left. */
+extern StepperMotor *Actuators[ACTUATOR_COUNT];
+
 void delay_us(uint16_t us);
 
-void Stepper_Move3(StepperMotor *motor1, GPIO_PinState dir1, uint32_t steps1,
-                   StepperMotor *motor2, GPIO_PinState dir2, uint32_t steps2,
-                   StepperMotor *motor3, GPIO_PinState dir3, uint32_t steps3);
+/*
+ * Step all three actuators together: motors[i] moves steps[i] pulses in
+ * direction dir[i]. Returns once the longest of the three has finished.
+ */
+void Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
+                   const GPIO_PinState dir[ACTUATOR_COUNT],
+                   const uint32_t steps[ACTUATOR_COUNT]);
 
 /*
  * Move all three actuators to the absolute target strokes in q[0..2] [mm].

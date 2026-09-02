@@ -136,23 +136,24 @@ int main(void)
 
   while (1)
   {
-
-    //TEST STEPPER MOVE - UNCOMMENT TO TEST
-    // Stepper_Move3(&FrontActuator, GPIO_PIN_SET, 200, &BackRightActuator, GPIO_PIN_SET, 200,
-    //               &BackLeftActuator, GPIO_PIN_SET, 200);
-    // HAL_Delay(200);
-    // Stepper_Move3(&FrontActuator, GPIO_PIN_RESET, 200, &BackRightActuator, GPIO_PIN_RESET, 200,
-    //               &BackLeftActuator, GPIO_PIN_RESET, 200);
-    // HAL_Delay(200);
-
-    Control_Update();
-
-    //BUTTON testing
-    Comms_UpdateAlarmLED();
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    //TEST STEPPER MOVE - UNCOMMENT TO TEST
+    // GPIO_PinState test_dir[ACTUATOR_COUNT];
+    // uint32_t test_steps[ACTUATOR_COUNT] = {200, 200, 200};
+    //
+    // for (int m = 0; m < ACTUATOR_COUNT; m++) test_dir[m] = GPIO_PIN_SET;
+    // Stepper_Move3(Actuators, test_dir, test_steps);
+    // HAL_Delay(200);
+    //
+    // for (int m = 0; m < ACTUATOR_COUNT; m++) test_dir[m] = GPIO_PIN_RESET;
+    // Stepper_Move3(Actuators, test_dir, test_steps);
+    // HAL_Delay(200);
+
+    Control_Update();
+    
   }
   /* USER CODE END 3 */
 }
