@@ -132,7 +132,8 @@ int main(void)
 
   Comms_Init(&hi2c1);
 
-  Comms_SendWelcomeMessage();
+  /* Start up in IDLE: yellow LED on, nothing reaches the motor drivers. */
+  Control_Init();
 
   while (1)
   {
@@ -143,11 +144,11 @@ int main(void)
     //TEST STEPPER MOVE - UNCOMMENT TO TEST
     // GPIO_PinState test_dir[ACTUATOR_COUNT];
     // uint32_t test_steps[ACTUATOR_COUNT] = {200, 200, 200};
-    //
+    
     // for (int m = 0; m < ACTUATOR_COUNT; m++) test_dir[m] = GPIO_PIN_SET;
     // Stepper_Move3(Actuators, test_dir, test_steps);
     // HAL_Delay(200);
-    //
+    
     // for (int m = 0; m < ACTUATOR_COUNT; m++) test_dir[m] = GPIO_PIN_RESET;
     // Stepper_Move3(Actuators, test_dir, test_steps);
     // HAL_Delay(200);
@@ -342,7 +343,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : START_BUTTON_Pin */
   GPIO_InitStruct.Pin = START_BUTTON_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(START_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT2_Pin */
@@ -366,6 +367,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(START_BUTTON_EXTI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(START_BUTTON_EXTI_IRQn);
+
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -375,6 +379,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+  * @brief  START / STOP push-button interrupt handler.
+  *
+  * Only raises a request flag; the state change, the LEDs and the PuTTY
+  * messages are handled by Control_Update() in the main loop.
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == START_BUTTON_Pin)
+  {
+    Control_StartRequest();
+  }
+  else if (GPIO_Pin == STOP_BUTTON_Pin)
+  {
+    Control_StopRequest();
+  }
+}
 
 /* USER CODE END 4 */
 

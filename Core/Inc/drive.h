@@ -49,12 +49,27 @@ extern StepperMotor *Actuators[ACTUATOR_COUNT];
 void delay_us(uint16_t us);
 
 /*
- * Step all three actuators together: motors[i] moves steps[i] pulses in
- * direction dir[i]. Returns once the longest of the three has finished.
+ * Emergency stop. Safe to call from an interrupt: it aborts the pulse loop
+ * inside Stepper_Move3() within one step period instead of waiting for the
+ * whole move to finish. Stays latched until Drive_ClearAbort().
  */
-void Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
-                   const GPIO_PinState dir[ACTUATOR_COUNT],
-                   const uint32_t steps[ACTUATOR_COUNT]);
+void Drive_AbortRequest(void);
+
+/* Clear a latched abort so moves are allowed again. */
+void Drive_ClearAbort(void);
+
+/* Non-zero while an abort is latched. */
+int Drive_Aborted(void);
+
+/*
+ * Step all three actuators together: motors[i] moves steps[i] pulses in
+ * direction dir[i]. Returns once the longest of the three has finished, or
+ * early if Drive_AbortRequest() fires. Returns the number of step pulses
+ * actually issued, so the caller can keep its position estimate honest.
+ */
+uint32_t Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
+                       const GPIO_PinState dir[ACTUATOR_COUNT],
+                       const uint32_t steps[ACTUATOR_COUNT]);
 
 /*
  * Move all three actuators to the absolute target strokes in q[0..2] [mm].

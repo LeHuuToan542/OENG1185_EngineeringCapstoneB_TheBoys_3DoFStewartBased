@@ -61,6 +61,7 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define START_BUTTON_Pin GPIO_PIN_3
 #define START_BUTTON_GPIO_Port GPIOF
+#define START_BUTTON_EXTI_IRQn EXTI3_IRQn
 #define STEP_OUT_ACT3_Pin GPIO_PIN_9
 #define STEP_OUT_ACT3_GPIO_Port GPIOE
 #define DIR_OUT_ACT2_Pin GPIO_PIN_11

@@ -4,9 +4,8 @@
  * Control Module: decides the target platform pose from the active input
  * source (IMU / PuTTY), runs IK, and drives the actuators.
  *
- * Currently just relocates the existing IMU/PuTTY decision logic from
- * main.c's loop as-is. This is the module to grow into a real state
- * machine later.
+ * Wrapped in a two-state machine (IDLE / RUNNING) driven by the START and
+ * STOP push buttons. Nothing reaches the motor drivers while IDLE.
  */
 
 #ifndef CONTROL_H
@@ -23,6 +22,16 @@ extern double pitch;
 
 /* Latest computed actuator stroke targets [mm], from simscape_ik(). */
 extern double q[3];
+
+/* Enter IDLE and announce it. Call once before the main loop. */
+void Control_Init(void);
+
+/*
+ * Button events. Safe to call from an EXTI callback: they only raise a
+ * flag, which Control_Update() acts on in the main loop.
+ */
+void Control_StartRequest(void);
+void Control_StopRequest(void);
 
 /* Call once per main loop iteration. */
 void Control_Update(void);

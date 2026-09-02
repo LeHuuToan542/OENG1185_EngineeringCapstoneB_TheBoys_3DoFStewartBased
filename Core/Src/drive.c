@@ -35,20 +35,53 @@ StepperMotor BackLeftActuator = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
 StepperMotor *Actuators[ACTUATOR_COUNT] = {&FrontActuator, &BackRightActuator,
                                            &BackLeftActuator};
 
+/*
+ * Latched by Drive_AbortRequest() from the STOP button interrupt and polled
+ * once per step by the pulse loop below.
+ */
+static volatile uint8_t abort_flag = 0;
+
 void delay_us(uint16_t us) {
   __HAL_TIM_SET_COUNTER(&htim1, 0); // set the counter value a 0
   while ((uint16_t)__HAL_TIM_GET_COUNTER(&htim1) < us); // wait for the counter to reach the us input in the parameter
 }
 
+void Drive_AbortRequest(void) {
+  abort_flag = 1;
+}
 
-void Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
-                   const GPIO_PinState dir[ACTUATOR_COUNT],
-                   const uint32_t steps[ACTUATOR_COUNT]) {
+void Drive_ClearAbort(void) {
+  abort_flag = 0;
+}
+
+int Drive_Aborted(void) {
+  return abort_flag != 0;
+}
+
+/*
+ * Park every STEP line low. Used on abort so no driver is left holding a
+ * half-finished pulse.
+ */
+static void Stepper_AllStepPinsLow(StepperMotor *motors[ACTUATOR_COUNT]) {
+  for (int m = 0; m < ACTUATOR_COUNT; m++) {
+    HAL_GPIO_WritePin(motors[m]->STEP_Port, motors[m]->STEP_Pin,
+                      GPIO_PIN_RESET);
+  }
+}
+
+uint32_t Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
+                       const GPIO_PinState dir[ACTUATOR_COUNT],
+                       const uint32_t steps[ACTUATOR_COUNT]) {
   /* ---------------------------------
      Set directions first
      --------------------------------- */
 
   uint32_t maxSteps = 0;
+
+  /* Refuse to start a move while a stop is latched. */
+  if (abort_flag) {
+    return 0;
+  }
 
   for (int m = 0; m < ACTUATOR_COUNT; m++) {
     HAL_GPIO_WritePin(motors[m]->DIR_Port, motors[m]->DIR_Pin, dir[m]);
@@ -64,7 +97,18 @@ void Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
      Generate steps simultaneously
      --------------------------------- */
 
+  uint32_t done = 0;
+
   for (uint32_t i = 0; i < maxSteps; i++) {
+    /*
+     * Check the STOP button between pulses. Worst case the platform
+     * travels one more step (~2 x STEP_PULSE_US) after the press.
+     */
+    if (abort_flag) {
+      Stepper_AllStepPinsLow(motors);
+      break;
+    }
+
     /*
      * Raise STEP only for motors which still need to move,
      * then bring the same signals LOW again.
@@ -87,7 +131,11 @@ void Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
     }
 
     delay_us(STEP_PULSE_US);
+
+    done++;
   }
+
+  return done;
 }
 
 void MoveActuatorsToTarget(double q[3]) {
@@ -122,17 +170,20 @@ void MoveActuatorsToTarget(double q[3]) {
   /*
    * Physically move all three actuators.
    */
-  Stepper_Move3(Actuators, dir, steps);
+  uint32_t done = Stepper_Move3(Actuators, dir, steps);
 
   /*
    * Update software-estimated positions.
    *
-   * We use the number of steps actually commanded rather
-   * than simply setting current position equal to q.
+   * We use the number of steps actually issued rather than simply setting
+   * current position equal to q. On an aborted move that is fewer than
+   * commanded, so the estimate still matches where the platform stopped.
    */
 
   for (int m = 0; m < ACTUATOR_COUNT; m++) {
-    double moved = (double)steps[m] / STEPS_PER_MM;
+    uint32_t issued = (steps[m] < done) ? steps[m] : done;
+
+    double moved = (double)issued / STEPS_PER_MM;
 
     if (dir[m] == GPIO_PIN_SET)
       Actuators[m]->current_stroke_length_mm += moved;
