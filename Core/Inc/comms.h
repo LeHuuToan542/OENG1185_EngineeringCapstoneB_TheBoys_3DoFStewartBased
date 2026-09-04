@@ -48,6 +48,8 @@ void Comms_SetAlarmLED(GPIO_PinState state);
 /* Mirror the start/test button state onto the alarm/status LED. */
 void Comms_UpdateAlarmLED(void);
 
+void UART_SendLegLengths(double q[3]);
+
 #ifdef __cplusplus
 }
 #endif

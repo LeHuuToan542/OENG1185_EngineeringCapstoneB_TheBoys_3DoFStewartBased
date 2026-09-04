@@ -147,6 +147,7 @@ void Control_Update(void) {
     Comms_Print("POSE COMMAND RECEIVED\r\n");
     simscape_ik(Z, roll, pitch, q);
     MoveActuatorsToTarget(q);
+    UART_SendLegLengths(q);
     Comms_Print("\r\nEnter next command:\r\n> ");
   } else if (cmd == -1) {
     Comms_Print("\r\nINVALID COMMAND. Expected Z,roll,pitch (e.g. 10,5,-3) or IMU\r\n> ");

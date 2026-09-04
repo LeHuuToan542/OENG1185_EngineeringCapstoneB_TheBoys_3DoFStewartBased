@@ -36,6 +36,8 @@ void Control_StopRequest(void);
 /* Call once per main loop iteration. */
 void Control_Update(void);
 
+void UART_SendLegLengths(double q[3]);
+
 #ifdef __cplusplus
 }
 #endif

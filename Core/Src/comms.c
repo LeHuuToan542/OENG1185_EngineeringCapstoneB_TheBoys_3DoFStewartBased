@@ -209,3 +209,18 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
 
   return 0;
 }
+
+void UART_SendLegLengths(double q[3]) {
+  char tx_buffer[64];
+
+  int length = snprintf(tx_buffer, sizeof(tx_buffer),
+
+                        "leg\t%8.2f\t%8.2f\t%8.2f\r\n",
+
+                        q[0], q[1], q[2]);
+
+  if (length > 0) {
+    HAL_UART_Transmit(&huart2, (uint8_t *)tx_buffer, (uint16_t)length,
+                      HAL_MAX_DELAY);
+  }
+}
