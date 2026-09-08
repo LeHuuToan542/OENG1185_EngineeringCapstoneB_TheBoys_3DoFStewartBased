@@ -378,20 +378,29 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOG, DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DIR_OUT_ACT3_GPIO_Port, DIR_OUT_ACT3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|STEP_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : STEP_OUT_ACT1_Pin */
+  GPIO_InitStruct.Pin = STEP_OUT_ACT1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(STEP_OUT_ACT1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : START_BUTTON_Pin */
   GPIO_InitStruct.Pin = START_BUTTON_Pin;
@@ -399,12 +408,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(START_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT2_Pin */
-  GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin;
+  /*Configure GPIO pin : DIR_OUT_ACT3_Pin */
+  GPIO_InitStruct.Pin = DIR_OUT_ACT3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+  HAL_GPIO_Init(DIR_OUT_ACT3_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : STOP_BUTTON_Pin */
   GPIO_InitStruct.Pin = STOP_BUTTON_Pin;
@@ -412,12 +421,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(STOP_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DIR_OUT_ACT3_Pin STEP_OUT_ACT1_Pin */
-  GPIO_InitStruct.Pin = DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin;
+  /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin STEP_OUT_ACT2_Pin DIR_OUT_ACT1_Pin */
+  GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|STEP_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*AnalogSwitch Config */
+  HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PC3, SYSCFG_SWITCH_PC3_CLOSE);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(START_BUTTON_EXTI_IRQn, 0, 0);
