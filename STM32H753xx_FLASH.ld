@@ -251,4 +251,16 @@ SECTIONS
     libgcc.a:* ( * )
   }
 
+.lwip_sec (NOLOAD) :
+{
+    . = ABSOLUTE(0x30040000);
+    *(.RxDescripSection)
+
+    . = ABSOLUTE(0x30040100);
+    *(.TxDescripSection)
+
+    . = ABSOLUTE(0x30040200);
+    *(.Rx_PoolSection)
+} >RAM_D2
+
 }
