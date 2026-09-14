@@ -9,9 +9,12 @@
 #include "comms.h"
 #include "bno055_dfrobot.h"
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 static BNO055_t bno;
 static BNO055_Euler_t bno_euler;
+static bool imu_ready = false;
 
 static char serial_rx_buffer[64];
 static uint8_t serial_rx_index = 0;
@@ -22,13 +25,24 @@ void Comms_Init(I2C_HandleTypeDef *hi2c) {
 
   BNO055_Status_t status = BNO055_Begin(&bno);
 
+  imu_ready = (status == BNO055_STATUS_OK);
+
   if (status != BNO055_STATUS_OK) {
     BNO055_PrintStatus(&bno, status);
   }
 }
 
+void Comms_Print(const char *text) {
+  HAL_UART_Transmit(
+      &hcom_uart[COM1],
+      (uint8_t *)text,
+      (uint16_t)strlen(text),
+      HAL_MAX_DELAY
+  );
+}
+
 void Comms_SendWelcomeMessage(void) {
-  char welcome_msg[] =
+  Comms_Print(
       "\r\n"
       "=== Stewart Platform Control ===\r\n"
       "Enter command as:\r\n"
@@ -41,17 +55,21 @@ void Comms_SendWelcomeMessage(void) {
       "roll  = angle in degrees\r\n"
       "pitch = angle in degrees\r\n"
       "\r\n"
-      "Type command and press ENTER:\r\n> ";
-
-  HAL_UART_Transmit(
-      &hcom_uart[COM1],
-      (uint8_t *)welcome_msg,
-      sizeof(welcome_msg) - 1,
-      HAL_MAX_DELAY
+      "Type command and press ENTER:\r\n> "
   );
 }
 
 int Comms_ReadIMU(double *roll, double *pitch) {
+  /*
+   * Skip the I2C transaction entirely when the IMU never came up.
+   * Otherwise every loop iteration blocks for the full I2C timeout,
+   * which starves the polled UART read below and drops PuTTY bytes
+   * (including the terminating Enter).
+   */
+  if (!imu_ready) {
+    return 0;
+  }
+
   if (BNO055_ReadEuler(&bno, &bno_euler) != BNO055_STATUS_OK) {
     return 0;
   }
@@ -149,9 +167,29 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
     serial_rx_index = 0;
 
     /*
-     * Convert ASCII command into numbers.
+     * Uppercase in place so the "IMU" keyword check is case-insensitive.
+     * Harmless to the numbers/commas ParsePoseCommand looks for below.
      */
-    return ParsePoseCommand(serial_rx_buffer, Z_cmd, roll_cmd, pitch_cmd);
+    for (uint8_t i = 0; serial_rx_buffer[i] != '\0'; i++) {
+      serial_rx_buffer[i] = (char)toupper((unsigned char)serial_rx_buffer[i]);
+    }
+
+    if (strcmp(serial_rx_buffer, "IMU") == 0) {
+      return 2;
+    }
+
+    /*
+     * Convert ASCII command into numbers.
+     *
+     * A complete line that does not parse returns -1 so the caller can
+     * report it. Returning 0 here would be indistinguishable from
+     * "no complete line has arrived yet".
+     */
+    if (ParsePoseCommand(serial_rx_buffer, Z_cmd, roll_cmd, pitch_cmd)) {
+      return 1;
+    }
+
+    return -1;
   }
 
   /*
@@ -172,26 +210,17 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
   return 0;
 }
 
-GPIO_PinState Comms_ReadButton(void) {
-  return HAL_GPIO_ReadPin(START_BUTTON_GPIO_Port, START_BUTTON_Pin);
-}
+void UART_SendLegLengths(double q[3]) {
+  char tx_buffer[64];
 
-void Comms_SetAlarmLED(GPIO_PinState state) {
-  if (state == GPIO_PIN_SET) {
-    BSP_LED_On(LED_GREEN);
-  } else {
-    BSP_LED_Off(LED_GREEN);
-  }
-}
+  int length = snprintf(tx_buffer, sizeof(tx_buffer),
 
-void Comms_UpdateAlarmLED(void) {
-  GPIO_PinState buttonState = Comms_ReadButton();
+                        "leg\t%8.2f\t%8.2f\t%8.2f\r\n",
 
-  if (buttonState == GPIO_PIN_SET) {
-    /* Button pressed */
-    Comms_SetAlarmLED(GPIO_PIN_SET);
-  } else {
-    /* Button released */
-    Comms_SetAlarmLED(GPIO_PIN_RESET);
+                        q[0], q[1], q[2]);
+
+  if (length > 0) {
+    HAL_UART_Transmit(&huart2, (uint8_t *)tx_buffer, (uint16_t)length,
+                      HAL_MAX_DELAY);
   }
 }

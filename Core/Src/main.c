@@ -1,4 +1,4 @@
-﻿/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "comms.h"
 #include "control.h"
+#include "drive.h"
 
 /* USER CODE END Includes */
 
@@ -49,6 +50,8 @@ I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
 
+UART_HandleTypeDef huart2;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -59,6 +62,7 @@ static void MPU_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -102,6 +106,7 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   MX_I2C1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -131,27 +136,29 @@ int main(void)
 
   Comms_Init(&hi2c1);
 
-  Comms_SendWelcomeMessage();
+  /* Start up in IDLE: yellow LED on, nothing reaches the motor drivers. */
+  Control_Init();
 
   while (1)
   {
-
-    //TEST STEPPER MOVE - UNCOMMENT TO TEST
-    // Stepper_Move3(&Actuator1, GPIO_PIN_SET, 200, &Actuator2, GPIO_PIN_SET, 200,
-    //               &Actuator3, GPIO_PIN_SET, 200);
-    // HAL_Delay(2);
-    // Stepper_Move3(&Actuator1, GPIO_PIN_RESET, 200, &Actuator2, GPIO_PIN_RESET, 200,
-    //               &Actuator3, GPIO_PIN_RESET, 200);
-    // HAL_Delay(2);
-
-    Control_Update();
-
-    //BUTTON testing
-    Comms_UpdateAlarmLED();
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    //TEST STEPPER MOVE - UNCOMMENT TO TEST
+    // GPIO_PinState test_dir[ACTUATOR_COUNT];
+    // uint32_t test_steps[ACTUATOR_COUNT] = {200, 200, 200};
+    
+    // for (int m = 0; m < ACTUATOR_COUNT; m++) test_dir[m] = GPIO_PIN_SET;
+    // Stepper_Move3(Actuators, test_dir, test_steps);
+    // HAL_Delay(200);
+    
+    // for (int m = 0; m < ACTUATOR_COUNT; m++) test_dir[m] = GPIO_PIN_RESET;
+    // Stepper_Move3(Actuators, test_dir, test_steps);
+    // HAL_Delay(200);
+
+    Control_Update();
+    
   }
   /* USER CODE END 3 */
 }
@@ -311,6 +318,54 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -323,38 +378,65 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOG, DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DIR_OUT_ACT3_GPIO_Port, DIR_OUT_ACT3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|STEP_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : STEP_OUT_ACT1_Pin */
+  GPIO_InitStruct.Pin = STEP_OUT_ACT1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(STEP_OUT_ACT1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : START_BUTTON_Pin */
   GPIO_InitStruct.Pin = START_BUTTON_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(START_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT2_Pin */
-  GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT2_Pin;
+  /*Configure GPIO pin : DIR_OUT_ACT3_Pin */
+  GPIO_InitStruct.Pin = DIR_OUT_ACT3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+  HAL_GPIO_Init(DIR_OUT_ACT3_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DIR_OUT_ACT3_Pin STEP_OUT_ACT1_Pin */
-  GPIO_InitStruct.Pin = DIR_OUT_ACT3_Pin|STEP_OUT_ACT1_Pin;
+  /*Configure GPIO pin : STOP_BUTTON_Pin */
+  GPIO_InitStruct.Pin = STOP_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(STOP_BUTTON_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin STEP_OUT_ACT2_Pin DIR_OUT_ACT1_Pin */
+  GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|STEP_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*AnalogSwitch Config */
+  HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PC3, SYSCFG_SWITCH_PC3_CLOSE);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(START_BUTTON_EXTI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(START_BUTTON_EXTI_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -362,6 +444,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+  * @brief  START / STOP push-button interrupt handler.
+  *
+  * Only raises a request flag; the state change, the LEDs and the PuTTY
+  * messages are handled by Control_Update() in the main loop.
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == START_BUTTON_Pin)
+  {
+    Control_StartRequest();
+  }
+  else if (GPIO_Pin == STOP_BUTTON_Pin)
+  {
+    Control_StopRequest();
+  }
+}
 
 /* USER CODE END 4 */
 

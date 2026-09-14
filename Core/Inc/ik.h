@@ -26,9 +26,9 @@ extern "C" {
 /* ---- Input/output limits ---- */
 
 #define IK_MAX_TILT_DEG         25.0   /* Max combined roll/pitch magnitude */
-#define IK_Z_CLAMP_MM           40.0   /* Z is clamped to +/- this value */
+#define IK_Z_CLAMP_MM           150.0   /* Z is clamped to +/- this value */
 #define IK_STROKE_MIN_MM        0.0
-#define IK_STROKE_MAX_MM        150.0
+#define IK_STROKE_MAX_MM        200
 
 /*
  * Compute the three actuator stroke targets q[0..2] [mm] for a requested

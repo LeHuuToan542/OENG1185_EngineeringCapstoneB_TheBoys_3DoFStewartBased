@@ -17,6 +17,9 @@ extern "C" {
 /* Attach the IMU driver and run its startup/calibration sequence. */
 void Comms_Init(I2C_HandleTypeDef *hi2c);
 
+/* Send a NUL-terminated string over the PuTTY serial link. */
+void Comms_Print(const char *text);
+
 /* Print the Stewart platform welcome banner over the PuTTY serial link. */
 void Comms_SendWelcomeMessage(void);
 
@@ -27,10 +30,12 @@ void Comms_SendWelcomeMessage(void);
 int Comms_ReadIMU(double *roll, double *pitch);
 
 /*
- * Parse a "Z,roll,pitch" command received over PuTTY.
- * Returns 1 and writes *Z_cmd, *roll_cmd, and *pitch_cmd on a complete,
- * valid command, 0 otherwise (including while a command is still being
- * typed).
+ * Read one line typed over PuTTY, if a complete line has arrived.
+ *
+ *   2 -> the literal command "IMU" (switch to IMU mode)
+ *   1 -> a "Z,roll,pitch" command; *Z_cmd, *roll_cmd, *pitch_cmd written
+ *   0 -> nothing to report yet (no complete line has arrived)
+ *  -1 -> a complete line arrived but could not be understood
  */
 int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd);
 
@@ -42,6 +47,8 @@ void Comms_SetAlarmLED(GPIO_PinState state);
 
 /* Mirror the start/test button state onto the alarm/status LED. */
 void Comms_UpdateAlarmLED(void);
+
+void UART_SendLegLengths(double q[3]);
 
 #ifdef __cplusplus
 }

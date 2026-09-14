@@ -37,14 +37,12 @@ void simscape_ik(double Z, double roll, double pitch, double q[3]) {
   }
 
   /*
-   * Limit Z to +/-40 mm.
+   * Limit Z to 40 mm.
    */
   double z_rel_clamped = Z;
 
   if (z_rel_clamped > IK_Z_CLAMP_MM) {
     z_rel_clamped = IK_Z_CLAMP_MM;
-  } else if (z_rel_clamped < -IK_Z_CLAMP_MM) {
-    z_rel_clamped = -IK_Z_CLAMP_MM;
   }
 
   /*

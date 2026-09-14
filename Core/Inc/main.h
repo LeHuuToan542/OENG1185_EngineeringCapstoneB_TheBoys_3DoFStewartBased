@@ -56,23 +56,28 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+extern UART_HandleTypeDef huart2;
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define STEP_OUT_ACT1_Pin GPIO_PIN_3
+#define STEP_OUT_ACT1_GPIO_Port GPIOE
 #define START_BUTTON_Pin GPIO_PIN_3
 #define START_BUTTON_GPIO_Port GPIOF
-#define STEP_OUT_ACT3_Pin GPIO_PIN_9
-#define STEP_OUT_ACT3_GPIO_Port GPIOE
-#define DIR_OUT_ACT2_Pin GPIO_PIN_11
-#define DIR_OUT_ACT2_GPIO_Port GPIOE
-#define DIR_OUT_ACT1_Pin GPIO_PIN_13
-#define DIR_OUT_ACT1_GPIO_Port GPIOE
-#define STEP_OUT_ACT2_Pin GPIO_PIN_14
-#define STEP_OUT_ACT2_GPIO_Port GPIOE
-#define DIR_OUT_ACT3_Pin GPIO_PIN_12
-#define DIR_OUT_ACT3_GPIO_Port GPIOG
-#define STEP_OUT_ACT1_Pin GPIO_PIN_14
-#define STEP_OUT_ACT1_GPIO_Port GPIOG
+#define START_BUTTON_EXTI_IRQn EXTI3_IRQn
+#define DIR_OUT_ACT3_Pin GPIO_PIN_3
+#define DIR_OUT_ACT3_GPIO_Port GPIOC
+#define STOP_BUTTON_Pin GPIO_PIN_15
+#define STOP_BUTTON_GPIO_Port GPIOD
+#define STOP_BUTTON_EXTI_IRQn EXTI15_10_IRQn
+#define STEP_OUT_ACT3_Pin GPIO_PIN_4
+#define STEP_OUT_ACT3_GPIO_Port GPIOD
+#define DIR_OUT_ACT2_Pin GPIO_PIN_5
+#define DIR_OUT_ACT2_GPIO_Port GPIOD
+#define STEP_OUT_ACT2_Pin GPIO_PIN_6
+#define STEP_OUT_ACT2_GPIO_Port GPIOD
+#define DIR_OUT_ACT1_Pin GPIO_PIN_7
+#define DIR_OUT_ACT1_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 
