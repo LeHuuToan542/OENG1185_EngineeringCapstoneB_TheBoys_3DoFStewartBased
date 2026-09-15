@@ -71,6 +71,19 @@ static void EnterRunning(void) {
 }
 
 void Control_Init(void) {
+  /*
+   * Home once at startup, before the system is ready to accept commands.
+   * Deliberately NOT re-run on every later EnterIdle() (e.g. a STOP press):
+   * an emergency stop must only halt motion, never kick off a new move.
+   */
+  Comms_Print("\r\n=== HOMING === Retracting all actuators to lower limit...\r\n");
+
+  if (Drive_HomeAll()) {
+    Comms_Print("=== HOMING COMPLETE ===\r\n");
+  } else {
+    Comms_Print("=== HOMING FAILED / ABORTED === Check limit switches and wiring.\r\n");
+  }
+
   EnterIdle();
 }
 

@@ -76,6 +76,25 @@ uint32_t Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
  */
 void MoveActuatorsToTarget(double q[3]);
 
+/*
+ * Home all three actuators: retract each (DIR = RESET) until its lower-limit
+ * switch reads triggered, or until a safety step-count timeout is hit (in
+ * case a switch is faulty/disconnected). Polls the limit-switch GPIOs
+ * directly rather than relying on their EXTI interrupts - homing is already
+ * a tight per-step loop, so polling gives the same latency with none of the
+ * ISR/flag plumbing.
+ *
+ * Zeroes current_stroke_length_mm for each actuator as its limit triggers,
+ * so this also re-calibrates position tracking against real hardware.
+ *
+ * Aborts early, like Stepper_Move3(), if Drive_AbortRequest() fires mid-
+ * sequence (e.g. STOP pressed during homing).
+ *
+ * Returns 1 if every actuator homed cleanly, 0 if aborted or if any
+ * actuator's limit switch never triggered before the timeout.
+ */
+int Drive_HomeAll(void);
+
 #ifdef __cplusplus
 }
 #endif

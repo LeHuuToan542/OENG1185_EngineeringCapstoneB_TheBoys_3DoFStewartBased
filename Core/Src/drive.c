@@ -191,3 +191,89 @@ void MoveActuatorsToTarget(double q[3]) {
       Actuators[m]->current_stroke_length_mm -= moved;
   }
 }
+
+/* Lower-limit switch for each actuator, same index order as Actuators[]. */
+static const struct {
+  GPIO_TypeDef *Port;
+  uint16_t Pin;
+} LowerLimit[ACTUATOR_COUNT] = {
+  {LOWERLIMIT_ACT1_GPIO_Port, LOWERLIMIT_ACT1_Pin},
+  {LOWERLIMIT_ACT2_GPIO_Port, LOWERLIMIT_ACT2_Pin},
+  {LOWERLIMIT_ACT3_GPIO_Port, LOWERLIMIT_ACT3_Pin},
+};
+
+/*
+ * Safety timeout for homing: a bit more than the full mechanical stroke, in
+ * case a limit switch never triggers (disconnected/faulty).
+ */
+#define HOMING_MAX_STROKE_MM 220.0
+#define HOMING_MAX_STEPS ((uint32_t)(HOMING_MAX_STROKE_MM * STEPS_PER_MM))
+
+static int LowerLimitHit(int m) {
+  return HAL_GPIO_ReadPin(LowerLimit[m].Port, LowerLimit[m].Pin) == GPIO_PIN_SET;
+}
+
+int Drive_HomeAll(void) {
+  uint8_t homed[ACTUATOR_COUNT] = {0};
+
+  if (abort_flag) {
+    return 0;
+  }
+
+  /* Point every actuator to retract, and note any that are already home. */
+  for (int m = 0; m < ACTUATOR_COUNT; m++) {
+    HAL_GPIO_WritePin(Actuators[m]->DIR_Port, Actuators[m]->DIR_Pin, GPIO_PIN_RESET);
+
+    if (LowerLimitHit(m)) {
+      homed[m] = 1;
+      Actuators[m]->current_stroke_length_mm = 0.0;
+    }
+  }
+
+  delay_us(STEP_PULSE_US);
+
+  for (uint32_t i = 0; i < HOMING_MAX_STEPS; i++) {
+    if (abort_flag) {
+      Stepper_AllStepPinsLow(Actuators);
+      return 0;
+    }
+
+    int all_home = 1;
+
+    for (int m = 0; m < ACTUATOR_COUNT; m++) {
+      if (!homed[m]) {
+        all_home = 0;
+        HAL_GPIO_WritePin(Actuators[m]->STEP_Port, Actuators[m]->STEP_Pin, GPIO_PIN_SET);
+      }
+    }
+
+    if (all_home) {
+      break;
+    }
+
+    delay_us(STEP_PULSE_US);
+
+    for (int m = 0; m < ACTUATOR_COUNT; m++) {
+      if (!homed[m]) {
+        HAL_GPIO_WritePin(Actuators[m]->STEP_Port, Actuators[m]->STEP_Pin, GPIO_PIN_RESET);
+      }
+    }
+
+    delay_us(STEP_PULSE_US);
+
+    for (int m = 0; m < ACTUATOR_COUNT; m++) {
+      if (!homed[m] && LowerLimitHit(m)) {
+        homed[m] = 1;
+        Actuators[m]->current_stroke_length_mm = 0.0;
+      }
+    }
+  }
+
+  for (int m = 0; m < ACTUATOR_COUNT; m++) {
+    if (!homed[m]) {
+      return 0; /* timed out: limit switch never triggered */
+    }
+  }
+
+  return 1;
+}

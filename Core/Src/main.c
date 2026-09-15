@@ -389,19 +389,25 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOE, STEP_OUT_ACT1_Pin|DIR_OUT_ACT3_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT3_Pin
                           |STEP_OUT_ACT2_Pin|DIR_OUT_ACT2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : UPPERLIMIT_ACT3_Pin STOP_BUTTON_Pin UPPERLIMIT_ACT2_Pin */
-  GPIO_InitStruct.Pin = UPPERLIMIT_ACT3_Pin|STOP_BUTTON_Pin|UPPERLIMIT_ACT2_Pin;
+  /*Configure GPIO pin : PC13 */
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : START_BUTTON_Pin LOWERLIMIT_ACT1_Pin LOWERLIMIT_ACT2_Pin LOWERLIMIT_ACT3_Pin
-                           UPPERLIMIT_ACT1_Pin */
-  GPIO_InitStruct.Pin = START_BUTTON_Pin|LOWERLIMIT_ACT1_Pin|LOWERLIMIT_ACT2_Pin|LOWERLIMIT_ACT3_Pin
-                          |UPPERLIMIT_ACT1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pins : UPPERLIMIT_ACT3_Pin START_BUTTON_Pin STOP_BUTTON_Pin LOWERLIMIT_ACT1_Pin
+                           LOWERLIMIT_ACT2_Pin UPPERLIMIT_ACT1_Pin UPPERLIMIT_ACT2_Pin */
+  GPIO_InitStruct.Pin = UPPERLIMIT_ACT3_Pin|START_BUTTON_Pin|STOP_BUTTON_Pin|LOWERLIMIT_ACT1_Pin
+                          |LOWERLIMIT_ACT2_Pin|UPPERLIMIT_ACT1_Pin|UPPERLIMIT_ACT2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LOWERLIMIT_ACT3_Pin */
+  GPIO_InitStruct.Pin = LOWERLIMIT_ACT3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(LOWERLIMIT_ACT3_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : STEP_OUT_ACT1_Pin DIR_OUT_ACT3_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT3_Pin
                            STEP_OUT_ACT2_Pin DIR_OUT_ACT2_Pin */
@@ -411,6 +417,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(UPPERLIMIT_ACT3_EXTI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(UPPERLIMIT_ACT3_EXTI_IRQn);
+
+  HAL_NVIC_SetPriority(START_BUTTON_EXTI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(START_BUTTON_EXTI_IRQn);
+
+  HAL_NVIC_SetPriority(STOP_BUTTON_EXTI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(STOP_BUTTON_EXTI_IRQn);
+
+  HAL_NVIC_SetPriority(LOWERLIMIT_ACT1_EXTI_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(LOWERLIMIT_ACT1_EXTI_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
