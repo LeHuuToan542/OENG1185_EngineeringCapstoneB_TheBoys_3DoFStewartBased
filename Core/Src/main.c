@@ -238,7 +238,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x307075B1;
+  hi2c1.Init.Timing = 0x10707DBC;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -378,65 +378,39 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(STEP_OUT_ACT1_GPIO_Port, STEP_OUT_ACT1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, STEP_OUT_ACT1_Pin|DIR_OUT_ACT3_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT3_Pin
+                          |STEP_OUT_ACT2_Pin|DIR_OUT_ACT2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(DIR_OUT_ACT3_GPIO_Port, DIR_OUT_ACT3_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|STEP_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : STEP_OUT_ACT1_Pin */
-  GPIO_InitStruct.Pin = STEP_OUT_ACT1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pins : UPPERLIMIT_ACT3_Pin STOP_BUTTON_Pin UPPERLIMIT_ACT2_Pin */
+  GPIO_InitStruct.Pin = UPPERLIMIT_ACT3_Pin|STOP_BUTTON_Pin|UPPERLIMIT_ACT2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(STEP_OUT_ACT1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : START_BUTTON_Pin */
-  GPIO_InitStruct.Pin = START_BUTTON_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  /*Configure GPIO pins : START_BUTTON_Pin LOWERLIMIT_ACT1_Pin LOWERLIMIT_ACT2_Pin LOWERLIMIT_ACT3_Pin
+                           UPPERLIMIT_ACT1_Pin */
+  GPIO_InitStruct.Pin = START_BUTTON_Pin|LOWERLIMIT_ACT1_Pin|LOWERLIMIT_ACT2_Pin|LOWERLIMIT_ACT3_Pin
+                          |UPPERLIMIT_ACT1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(START_BUTTON_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : DIR_OUT_ACT3_Pin */
-  GPIO_InitStruct.Pin = DIR_OUT_ACT3_Pin;
+  /*Configure GPIO pins : STEP_OUT_ACT1_Pin DIR_OUT_ACT3_Pin DIR_OUT_ACT1_Pin STEP_OUT_ACT3_Pin
+                           STEP_OUT_ACT2_Pin DIR_OUT_ACT2_Pin */
+  GPIO_InitStruct.Pin = STEP_OUT_ACT1_Pin|DIR_OUT_ACT3_Pin|DIR_OUT_ACT1_Pin|STEP_OUT_ACT3_Pin
+                          |STEP_OUT_ACT2_Pin|DIR_OUT_ACT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(DIR_OUT_ACT3_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : STOP_BUTTON_Pin */
-  GPIO_InitStruct.Pin = STOP_BUTTON_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(STOP_BUTTON_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : STEP_OUT_ACT3_Pin DIR_OUT_ACT2_Pin STEP_OUT_ACT2_Pin DIR_OUT_ACT1_Pin */
-  GPIO_InitStruct.Pin = STEP_OUT_ACT3_Pin|DIR_OUT_ACT2_Pin|STEP_OUT_ACT2_Pin|DIR_OUT_ACT1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  /*AnalogSwitch Config */
-  HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PC3, SYSCFG_SWITCH_PC3_CLOSE);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(START_BUTTON_EXTI_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(START_BUTTON_EXTI_IRQn);
-
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
