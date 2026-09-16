@@ -18,7 +18,7 @@ extern "C" {
 
 #define MOTOR_STEPS_PER_REV 200.0
 #define MICROSTEP 1
-#define MM_PER_REV 6
+#define MM_PER_REV 5.4
 
 #define STEPS_PER_MM ((MOTOR_STEPS_PER_REV * MICROSTEP) / MM_PER_REV)
 
