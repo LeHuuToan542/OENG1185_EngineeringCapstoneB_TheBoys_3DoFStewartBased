@@ -8,6 +8,7 @@
 
 #include "comms.h"
 #include "bno055_dfrobot.h"
+#include "drive.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -54,6 +55,14 @@ void Comms_SendWelcomeMessage(void) {
       "Z     = heave in mm\r\n"
       "roll  = angle in degrees\r\n"
       "pitch = angle in degrees\r\n"
+      "\r\n"
+      "Single-actuator test: An,mm,dir\r\n"
+      "  n   = actuator number 1-3\r\n"
+      "  mm  = jog distance in mm\r\n"
+      "  dir = 1 (extend) or 0 (retract)\r\n"
+      "Example: A1,10,1\r\n"
+      "\r\n"
+      "LIM = watch the limit switches live\r\n"
       "\r\n"
       "Type command and press ENTER:\r\n> "
   );
@@ -130,7 +139,58 @@ int ParsePoseCommand(char *text, double *Z_cmd, double *roll_cmd,
   return 1;
 }
 
-int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
+/*
+ * Parse a single-actuator test command of the form "An,mm,dir", e.g.
+ * "A1,10,1" to jog actuator 1 by 10 mm extending.
+ *
+ *   n   = actuator number, 1..ACTUATOR_COUNT
+ *   mm  = non-negative jog distance in mm
+ *   dir = 1 (extend) or 0 (retract)
+ *
+ * Returns 1 and writes *actuator (0-based), *dir, *mm on success, 0 if the
+ * text is not shaped like this command at all (so the caller can fall back
+ * to trying other command forms).
+ */
+static int ParseActuatorTestCommand(const char *text, int *actuator, int *dir,
+                                    double *mm) {
+  if (text[0] != 'A') {
+    return 0;
+  }
+
+  char *end;
+
+  long idx = strtol(text + 1, &end, 10);
+
+  if (end == text + 1 || *end != ',' || idx < 1 || idx > ACTUATOR_COUNT) {
+    return 0;
+  }
+
+  double d_mm = strtod(end + 1, &end);
+
+  if (*end != ',' || d_mm < 0.0) {
+    return 0;
+  }
+
+  long d = strtol(end + 1, &end, 10);
+
+  while (*end == ' ') {
+    end++;
+  }
+
+  if (*end != '\0' || (d != 0 && d != 1)) {
+    return 0;
+  }
+
+  *actuator = (int)idx - 1;
+  *mm = d_mm;
+  *dir = (int)d;
+
+  return 1;
+}
+
+int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd,
+                           int *test_actuator, int *test_dir,
+                           double *test_mm) {
   uint8_t rx_byte;
 
   /*
@@ -176,6 +236,18 @@ int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd) {
 
     if (strcmp(serial_rx_buffer, "IMU") == 0) {
       return 2;
+    }
+
+    if (strcmp(serial_rx_buffer, "LIM") == 0) {
+      return 4;
+    }
+
+    /*
+     * Single-actuator test command, e.g. "A1,10,1".
+     */
+    if (ParseActuatorTestCommand(serial_rx_buffer, test_actuator, test_dir,
+                                 test_mm)) {
+      return 3;
     }
 
     /*

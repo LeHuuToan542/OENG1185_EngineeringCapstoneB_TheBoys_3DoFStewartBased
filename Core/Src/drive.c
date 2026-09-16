@@ -16,6 +16,12 @@ StepperMotor FrontActuator = {.STEP_Port = STEP_OUT_ACT1_GPIO_Port,
                           .DIR_Port = DIR_OUT_ACT1_GPIO_Port,
                           .DIR_Pin = DIR_OUT_ACT1_Pin,
 
+                          .UPPER_LIMIT_Port = UPPERLIMIT_ACT1_GPIO_Port,
+                          .UPPER_LIMIT_Pin = UPPERLIMIT_ACT1_Pin,
+
+                          .LOWER_LIMIT_Port = LOWERLIMIT_ACT1_GPIO_Port,
+                          .LOWER_LIMIT_Pin = LOWERLIMIT_ACT1_Pin,
+
                           .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
 StepperMotor BackRightActuator = {.STEP_Port = STEP_OUT_ACT2_GPIO_Port,
@@ -23,6 +29,13 @@ StepperMotor BackRightActuator = {.STEP_Port = STEP_OUT_ACT2_GPIO_Port,
 
                           .DIR_Port = DIR_OUT_ACT2_GPIO_Port,
                           .DIR_Pin = DIR_OUT_ACT2_Pin,
+
+                          .UPPER_LIMIT_Port = UPPERLIMIT_ACT2_GPIO_Port,
+                          .UPPER_LIMIT_Pin = UPPERLIMIT_ACT2_Pin,
+
+                          .LOWER_LIMIT_Port = LOWERLIMIT_ACT2_GPIO_Port,
+                          .LOWER_LIMIT_Pin = LOWERLIMIT_ACT2_Pin,
+
                           .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
 StepperMotor BackLeftActuator = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
@@ -30,6 +43,13 @@ StepperMotor BackLeftActuator = {.STEP_Port = STEP_OUT_ACT3_GPIO_Port,
 
                           .DIR_Port = DIR_OUT_ACT3_GPIO_Port,
                           .DIR_Pin = DIR_OUT_ACT3_Pin,
+
+                          .UPPER_LIMIT_Port = UPPERLIMIT_ACT3_GPIO_Port,
+                          .UPPER_LIMIT_Pin = UPPERLIMIT_ACT3_Pin,
+
+                          .LOWER_LIMIT_Port = LOWERLIMIT_ACT3_GPIO_Port,
+                          .LOWER_LIMIT_Pin = LOWERLIMIT_ACT3_Pin,
+
                           .current_stroke_length_mm = 0.0}; // Initialize current stroke length to 0.0 mm
 
 StepperMotor *Actuators[ACTUATOR_COUNT] = {&FrontActuator, &BackRightActuator,
@@ -44,6 +64,20 @@ static volatile uint8_t abort_flag = 0;
 void delay_us(uint16_t us) {
   __HAL_TIM_SET_COUNTER(&htim1, 0); // set the counter value a 0
   while ((uint16_t)__HAL_TIM_GET_COUNTER(&htim1) < us); // wait for the counter to reach the us input in the parameter
+}
+
+int Drive_UpperLimitHit(int actuator) {
+  StepperMotor *m = Actuators[actuator];
+
+  return HAL_GPIO_ReadPin(m->UPPER_LIMIT_Port, m->UPPER_LIMIT_Pin) ==
+         LIMIT_ACTIVE_STATE;
+}
+
+int Drive_LowerLimitHit(int actuator) {
+  StepperMotor *m = Actuators[actuator];
+
+  return HAL_GPIO_ReadPin(m->LOWER_LIMIT_Port, m->LOWER_LIMIT_Pin) ==
+         LIMIT_ACTIVE_STATE;
 }
 
 void Drive_AbortRequest(void) {

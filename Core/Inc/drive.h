@@ -28,12 +28,26 @@ extern "C" {
 /* Number of actuators. */
 #define ACTUATOR_COUNT 3
 
+/*
+ * Pin level that means "switch pressed". The limit pins are configured with
+ * a pull-down in MX_GPIO_Init(), so this assumes each switch feeds 3V3 into
+ * the pin when it closes. Flip to GPIO_PIN_RESET if the switches are instead
+ * wired to GND (which also needs the pull changed to GPIO_PULLUP).
+ */
+#define LIMIT_ACTIVE_STATE GPIO_PIN_SET
+
 typedef struct {
   GPIO_TypeDef *STEP_Port;
   uint16_t STEP_Pin;
 
   GPIO_TypeDef *DIR_Port;
   uint16_t DIR_Pin;
+
+  GPIO_TypeDef *UPPER_LIMIT_Port;
+  uint16_t UPPER_LIMIT_Pin;
+
+  GPIO_TypeDef *LOWER_LIMIT_Port;
+  uint16_t LOWER_LIMIT_Pin;
 
   double current_stroke_length_mm; // Current actuator stroke length in mm.
 
@@ -47,6 +61,13 @@ extern StepperMotor BackLeftActuator;
 extern StepperMotor *Actuators[ACTUATOR_COUNT];
 
 void delay_us(uint16_t us);
+
+/*
+ * Read one actuator's end-of-travel switches, indexed 0..ACTUATOR_COUNT-1 in
+ * Actuators[] order. Non-zero while the switch is pressed.
+ */
+int Drive_UpperLimitHit(int actuator);
+int Drive_LowerLimitHit(int actuator);
 
 /*
  * Emergency stop. Safe to call from an interrupt: it aborts the pulse loop
