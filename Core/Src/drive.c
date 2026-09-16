@@ -69,6 +69,84 @@ static void Stepper_AllStepPinsLow(StepperMotor *motors[ACTUATOR_COUNT]) {
   }
 }
 
+/*
+ * Lower-limit switches in Actuators[] order (front, back-right, back-left).
+ * The pins are configured as inputs with a pull-down, so an open switch reads
+ * LOW and a closed (hit) switch reads HIGH.
+ */
+static GPIO_TypeDef *const LowerLimit_Port[ACTUATOR_COUNT] = {
+    LOWERLIMIT_ACT1_GPIO_Port, LOWERLIMIT_ACT2_GPIO_Port,
+    LOWERLIMIT_ACT3_GPIO_Port};
+
+static const uint16_t LowerLimit_Pin[ACTUATOR_COUNT] = {
+    LOWERLIMIT_ACT1_Pin, LOWERLIMIT_ACT2_Pin, LOWERLIMIT_ACT3_Pin};
+
+static int LowerLimitHit(int m) {
+  return HAL_GPIO_ReadPin(LowerLimit_Port[m], LowerLimit_Pin[m]) ==
+         GPIO_PIN_SET;
+}
+
+int Drive_Home(void) {
+  const uint32_t max_steps =
+      (uint32_t)((HOMING_MAX_TRAVEL_MM * STEPS_PER_MM) + 0.5);
+
+  if (abort_flag) {
+    return 0;
+  }
+
+  /* Retract all three. */
+  for (int m = 0; m < ACTUATOR_COUNT; m++) {
+    HAL_GPIO_WritePin(Actuators[m]->DIR_Port, Actuators[m]->DIR_Pin,
+                      GPIO_PIN_RESET);
+  }
+
+  delay_us(STEP_PULSE_US);
+
+  for (uint32_t i = 0; i < max_steps; i++) {
+    if (abort_flag) {
+      Stepper_AllStepPinsLow(Actuators);
+      return 0;
+    }
+
+    /*
+     * Pulse only the actuators still off their switch. Each one drops out of
+     * the move the moment its own limit closes.
+     */
+    int still_moving = 0;
+
+    for (int m = 0; m < ACTUATOR_COUNT; m++) {
+      if (!LowerLimitHit(m)) {
+        HAL_GPIO_WritePin(Actuators[m]->STEP_Port, Actuators[m]->STEP_Pin,
+                          GPIO_PIN_SET);
+        still_moving = 1;
+      }
+    }
+
+    if (!still_moving) {
+      /* All three switches closed: this position is the zero reference. */
+      for (int m = 0; m < ACTUATOR_COUNT; m++) {
+        Actuators[m]->current_stroke_length_mm = 0.0;
+      }
+
+      return 1;
+    }
+
+    delay_us(STEP_PULSE_US);
+
+    Stepper_AllStepPinsLow(Actuators);
+
+    delay_us(STEP_PULSE_US);
+  }
+
+  /*
+   * Ran the full stroke without every switch closing. Position is unknown, so
+   * leave the estimates alone and let the caller decide what to do.
+   */
+  Stepper_AllStepPinsLow(Actuators);
+
+  return 0;
+}
+
 uint32_t Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
                        const GPIO_PinState dir[ACTUATOR_COUNT],
                        const uint32_t steps[ACTUATOR_COUNT]) {

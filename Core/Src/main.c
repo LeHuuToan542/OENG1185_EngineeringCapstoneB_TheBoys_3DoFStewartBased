@@ -136,6 +136,16 @@ int main(void)
 
   Comms_Init(&hi2c1);
 
+  /*
+   * Find the mechanical zero before anything else can command a pose. Runs
+   * ahead of Control_Init() because that latches the abort flag.
+   */
+  if (Drive_Home()) {
+    Comms_Print("\r\nHOMING COMPLETE: all actuators at stroke 0.\r\n");
+  } else {
+    Comms_Print("\r\nHOMING FAILED: lower limit not reached.\r\n");
+  }
+
   /* Start up in IDLE: yellow LED on, nothing reaches the motor drivers. */
   Control_Init();
 
