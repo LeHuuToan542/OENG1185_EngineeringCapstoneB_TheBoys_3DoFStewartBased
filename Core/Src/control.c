@@ -9,10 +9,11 @@
 #include "comms.h"
 #include "ik.h"
 #include "drive.h"
+#include <stdio.h>
 
 double q[3];
 
-double Z = 50;
+double Z = 0;
 double roll = 0;
 double pitch = 0;
 
@@ -108,6 +109,8 @@ void Control_StopRequest(void) {
 
 void Control_Update(void) {
   double Z_cmd, roll_cmd, pitch_cmd;
+  int test_actuator, test_dir;
+  double test_mm;
 
   /*
    * STOP wins over START so a simultaneous press leaves the platform safe.
@@ -131,7 +134,8 @@ void Control_Update(void) {
     return;
   }
 
-  int cmd = Serial_ReadPoseCommand(&Z_cmd, &roll_cmd, &pitch_cmd);
+  int cmd = Serial_ReadPoseCommand(&Z_cmd, &roll_cmd, &pitch_cmd,
+                                   &test_actuator, &test_dir, &test_mm);
 
   if (cmd == 2) {
     imu_mode = 1;
@@ -149,8 +153,41 @@ void Control_Update(void) {
     MoveActuatorsToTarget(q);
     UART_SendLegLengths(q);
     Comms_Print("\r\nEnter next command:\r\n> ");
+  } else if (cmd == 3) {
+    imu_mode = 0;
+
+    /*
+     * Drive only the selected actuator: zero steps for the others means
+     * Stepper_Move3() never pulses their STEP lines.
+     */
+    GPIO_PinState dir[ACTUATOR_COUNT] = {GPIO_PIN_RESET, GPIO_PIN_RESET,
+                                         GPIO_PIN_RESET};
+    uint32_t steps[ACTUATOR_COUNT] = {0, 0, 0};
+
+    dir[test_actuator] = test_dir ? GPIO_PIN_SET : GPIO_PIN_RESET;
+    steps[test_actuator] = (uint32_t)(test_mm * STEPS_PER_MM + 0.5);
+
+    char msg[64];
+    int len = snprintf(msg, sizeof(msg), "TESTING ACTUATOR %d: %.2f mm %s\r\n",
+                       test_actuator + 1, test_mm,
+                       test_dir ? "EXTEND" : "RETRACT");
+    if (len > 0) {
+      Comms_Print(msg);
+    }
+
+    uint32_t done = Stepper_Move3(Actuators, dir, steps);
+
+    double moved = (double)done / STEPS_PER_MM;
+
+    if (test_dir)
+      Actuators[test_actuator]->current_stroke_length_mm += moved;
+    else
+      Actuators[test_actuator]->current_stroke_length_mm -= moved;
+
+    Comms_Print("\r\nEnter next command:\r\n> ");
   } else if (cmd == -1) {
-    Comms_Print("\r\nINVALID COMMAND. Expected Z,roll,pitch (e.g. 10,5,-3) or IMU\r\n> ");
+    Comms_Print("\r\nINVALID COMMAND. Expected Z,roll,pitch (e.g. 10,5,-3), "
+               "An,mm,dir (e.g. A1,10,1), or IMU\r\n> ");
   }
 
   if (imu_mode) {
