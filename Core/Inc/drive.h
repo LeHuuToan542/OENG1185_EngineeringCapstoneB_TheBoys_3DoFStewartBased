@@ -18,7 +18,7 @@ extern "C" {
 
 #define MOTOR_STEPS_PER_REV 200.0
 #define MICROSTEP 1
-#define MM_PER_REV 12.0
+#define MM_PER_REV 5.4
 
 #define STEPS_PER_MM ((MOTOR_STEPS_PER_REV * MICROSTEP) / MM_PER_REV)
 
@@ -27,6 +27,12 @@ extern "C" {
 
 /* Number of actuators. */
 #define ACTUATOR_COUNT 3
+
+/*
+ * Safety cap for homing: the most travel one actuator is allowed before we
+ * give up waiting for its lower limit switch. Slightly over full stroke.
+ */
+#define HOMING_MAX_TRAVEL_MM 220.0
 
 typedef struct {
   GPIO_TypeDef *STEP_Port;
@@ -70,6 +76,14 @@ int Drive_Aborted(void);
 uint32_t Stepper_Move3(StepperMotor *motors[ACTUATOR_COUNT],
                        const GPIO_PinState dir[ACTUATOR_COUNT],
                        const uint32_t steps[ACTUATOR_COUNT]);
+
+/*
+ * Retract all three actuators until each one closes its lower limit switch,
+ * then define that position as stroke 0 for all three. Returns 1 on success,
+ * 0 if a STOP was latched or an actuator ran HOMING_MAX_TRAVEL_MM without its
+ * switch closing (in which case the position estimates are left untouched).
+ */
+int Drive_Home(void);
 
 /*
  * Move all three actuators to the absolute target strokes in q[0..2] [mm].

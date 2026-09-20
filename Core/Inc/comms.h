@@ -34,10 +34,15 @@ int Comms_ReadIMU(double *roll, double *pitch);
  *
  *   2 -> the literal command "IMU" (switch to IMU mode)
  *   1 -> a "Z,roll,pitch" command; *Z_cmd, *roll_cmd, *pitch_cmd written
+ *   3 -> an "An,mm,dir" single-actuator test command (e.g. "A1,10,1");
+ *        *test_actuator (0-based), *test_dir (1 = extend, 0 = retract) and
+ *        *test_mm (jog distance in mm) written
  *   0 -> nothing to report yet (no complete line has arrived)
  *  -1 -> a complete line arrived but could not be understood
  */
-int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd);
+int Serial_ReadPoseCommand(double *Z_cmd, double *roll_cmd, double *pitch_cmd,
+                           int *test_actuator, int *test_dir,
+                           double *test_mm);
 
 /* Read the start/test push button. */
 GPIO_PinState Comms_ReadButton(void);
